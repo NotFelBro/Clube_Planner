@@ -1,23 +1,31 @@
+
 {
   "name": "clube_planner",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Backend do e-commerce Clube Planner, desenvolvido com Node.js, Express, MongoDB e Mongoose.",
+  "main": "src/server.js",
   "directories": {
     "doc": "docs",
     "test": "tests"
   },
   "scripts": {
-  "start": "node src/server.js",
-  "dev": "nodemon src/server.js",
-  "test": "vitest run",
-  "test:watch": "vitest"
-},
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/NotFelBro/Clube_Planner.git"
   },
-  "keywords": [],
+  "keywords": [
+    "nodejs",
+    "express",
+    "mongodb",
+    "mongoose",
+    "ecommerce",
+    "api-rest"
+  ],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
