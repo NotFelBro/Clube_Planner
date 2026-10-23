@@ -1,0 +1,15 @@
+
+services:
+  mongodb:
+    image: docker.io/library/mongo:8.0
+    container_name: clube-planner-mongo
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "127.0.0.1:27018:27017"
+    volumes:
+      - clube_planner_mongodb_data:/data/db
+    restart: unless-stopped
+
+volumes:
+  clube_planner_mongodb_data:
+  
