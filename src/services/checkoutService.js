@@ -257,8 +257,193 @@ async function reservarCupom({
   };
 }
 
+
+/**
+ * Consome uma reserva de cupom.
+ *
+ * Transição permitida:
+ * reserved -> consumed
+ *
+ * Chamadas repetidas após o consumo
+ * não alteram os contadores.
+ */
+async function consumirCupom({ redemptionId, session }) {
+  if (!session) {
+    throw new Error("Sessão MongoDB obrigatória.");
+  }
+
+  if (!mongoose.isObjectIdOrHexString(redemptionId)) {
+    throw new Error("Identificador inválido.");
+  }
+
+  const reserva = await CouponRedemption.findById(
+    redemptionId
+  ).session(session);
+
+  if (!reserva) {
+    throw new Error("Reserva de cupom não encontrada.");
+  }
+
+  if (reserva.status === "consumed") {
+    return {
+      redemptionId: reserva._id,
+      status: "consumed",
+      reutilizado: true,
+    };
+  }
+
+  if (reserva.status === "released") {
+    throw new Error(
+      "Uma reserva liberada não pode ser consumida."
+    );
+  }
+
+  const agora = new Date();
+
+  const resultado = await CouponRedemption.updateOne(
+    {
+      _id: redemptionId,
+      status: "reserved",
+    },
+    {
+      $set: {
+        status: "consumed",
+        consumedAt: agora,
+      },
+    },
+    { session }
+  );
+
+  if (resultado.modifiedCount !== 1) {
+    throw new Error(
+      "Não foi possível consumir a reserva."
+    );
+  }
+
+  const cupom = await Coupon.updateOne(
+    {
+      _id: reserva.couponId,
+      usosReservados: { $gte: 1 },
+    },
+    {
+      $inc: {
+        usosReservados: -1,
+        usosRealizados: 1,
+        revisaoUso: 1,
+      },
+    },
+    { session }
+  );
+
+  if (cupom.modifiedCount !== 1) {
+    throw new Error(
+      "Falha ao atualizar os contadores do cupom."
+    );
+  }
+
+  return {
+    redemptionId: reserva._id,
+    status: "consumed",
+    reutilizado: false,
+  };
+}
+
+/**
+ * Libera uma reserva de cupom.
+ *
+ * Transição permitida:
+ * reserved -> released
+ *
+ * Chamadas repetidas após a liberação
+ * não alteram os contadores.
+ */
+async function liberarCupom({ redemptionId, session }) {
+  if (!session) {
+    throw new Error("Sessão MongoDB obrigatória.");
+  }
+
+  if (!mongoose.isObjectIdOrHexString(redemptionId)) {
+    throw new Error("Identificador inválido.");
+  }
+
+  const reserva = await CouponRedemption.findById(
+    redemptionId
+  ).session(session);
+
+  if (!reserva) {
+    throw new Error("Reserva de cupom não encontrada.");
+  }
+
+  if (reserva.status === "released") {
+    return {
+      redemptionId: reserva._id,
+      status: "released",
+      reutilizado: true,
+    };
+  }
+
+  if (reserva.status === "consumed") {
+    throw new Error(
+      "Uma reserva consumida não pode ser liberada."
+    );
+  }
+
+  const agora = new Date();
+
+  const resultado = await CouponRedemption.updateOne(
+    {
+      _id: redemptionId,
+      status: "reserved",
+    },
+    {
+      $set: {
+        status: "released",
+        releasedAt: agora,
+      },
+    },
+    { session }
+  );
+
+  if (resultado.modifiedCount !== 1) {
+    throw new Error(
+      "Não foi possível liberar a reserva."
+    );
+  }
+
+  const cupom = await Coupon.updateOne(
+    {
+      _id: reserva.couponId,
+      usosReservados: { $gte: 1 },
+    },
+    {
+      $inc: {
+        usosReservados: -1,
+        revisaoUso: 1,
+      },
+    },
+    { session }
+  );
+
+  if (cupom.modifiedCount !== 1) {
+    throw new Error(
+      "Falha ao atualizar os contadores do cupom."
+    );
+  }
+
+  return {
+    redemptionId: reserva._id,
+    status: "released",
+    reutilizado: false,
+  };
+}
+
+
+
 module.exports = {
   executarTransacao,
   reservarEstoque,
   reservarCupom,
+  consumirCupom,
+  liberarCupom,
 };
+

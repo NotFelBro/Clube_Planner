@@ -200,6 +200,169 @@ describe("Reserva transacional de cupons", () => {
     }
   });
 
+
+it("impede reservas concorrentes do mesmo usuário", async () => {
+  const agora = Date.now();
+
+  const cupom = await Coupon.create({
+    codigo: `USUARIO${new mongoose.Types.ObjectId().toHexString()}`,
+    tipo: "percentual",
+    valor: 10,
+    pedidoMinimoCentavos: 0,
+    limiteUsos: 10,
+    limiteUsosPorUsuario: 1,
+    inicioEm: new Date(agora - 60000),
+    expiraEm: new Date(agora + 3600000),
+    ativo: true,
+  });
+
+  const usuario = new mongoose.Types.ObjectId();
+
+  // Os pedidos são diferentes, mas pertencem ao mesmo usuário.
+  const pedidos = [
+    new mongoose.Types.ObjectId(),
+    new mongoose.Types.ObjectId(),
+  ];
+
+  try {
+    const tentativas = pedidos.map((pedido) =>
+      executarTransacao((session) =>
+        reservarCupom({
+          couponId: cupom._id,
+          userId: usuario,
+          orderId: pedido,
+          subtotalCentavos: 2000,
+          session,
+        })
+      )
+    );
+
+    const resultados = await Promise.allSettled(tentativas);
+
+    const aprovadas = resultados.filter(
+      (resultado) => resultado.status === "fulfilled"
+    );
+
+    const rejeitadas = resultados.filter(
+      (resultado) => resultado.status === "rejected"
+    );
+
+    expect(aprovadas).toHaveLength(1);
+    expect(rejeitadas).toHaveLength(1);
+
+    const atualizado = await Coupon.findById(cupom._id);
+
+    expect(atualizado.usosReservados).toBe(1);
+    expect(atualizado.usosRealizados).toBe(0);
+
+    const reservas = await CouponRedemption.find({
+      couponId: cupom._id,
+      userId: usuario,
+      status: "reserved",
+    });
+
+    expect(reservas).toHaveLength(1);
+    expect(
+      pedidos.some(
+        (pedido) =>
+          String(pedido) === String(reservas[0].orderId)
+      )
+    ).toBe(true);
+  } finally {
+    await CouponRedemption.deleteMany({
+      couponId: cupom._id,
+    });
+
+    await Coupon.deleteOne({
+      _id: cupom._id,
+    });
+  }
+});
+
+
+it("não duplica reservas simultâneas do mesmo pedido", async () => {
+  const agora = Date.now();
+
+  const cupom = await Coupon.create({
+    codigo: `DUPLICADO${new mongoose.Types.ObjectId().toHexString()}`,
+    tipo: "percentual",
+    valor: 10,
+    pedidoMinimoCentavos: 0,
+    limiteUsos: 10,
+    limiteUsosPorUsuario: 10,
+    inicioEm: new Date(agora - 60000),
+    expiraEm: new Date(agora + 3600000),
+    ativo: true,
+  });
+
+  const usuario = new mongoose.Types.ObjectId();
+  const pedido = new mongoose.Types.ObjectId();
+
+  try {
+    const tentativas = Array.from({ length: 2 }, () =>
+      executarTransacao((session) =>
+        reservarCupom({
+          couponId: cupom._id,
+          userId: usuario,
+          orderId: pedido,
+          subtotalCentavos: 2000,
+          session,
+        })
+      )
+    );
+
+    const resultados = await Promise.allSettled(tentativas);
+
+    // Uma tentativa deve concluir.
+    const aprovadas = resultados.filter(
+      (r) => r.status === "fulfilled"
+    );
+
+    expect(aprovadas.length).toBeGreaterThanOrEqual(1);
+
+    // Independentemente dos conflitos, apenas uma
+    // utilização deve existir no banco.
+    const atualizado = await Coupon.findById(cupom._id);
+
+    expect(atualizado.usosReservados).toBe(1);
+    expect(atualizado.usosRealizados).toBe(0);
+
+    const reservas = await CouponRedemption.find({
+      couponId: cupom._id,
+      orderId: pedido,
+    });
+
+    expect(reservas).toHaveLength(1);
+    expect(reservas[0].status).toBe("reserved");
+
+    // Uma repetição posterior deve reutilizar
+    // a mesma reserva sem incrementar o contador.
+    const repeticao = await executarTransacao(
+      (session) =>
+        reservarCupom({
+          couponId: cupom._id,
+          userId: usuario,
+          orderId: pedido,
+          subtotalCentavos: 2000,
+          session,
+        })
+    );
+
+    expect(repeticao.reutilizado).toBe(true);
+    expect(String(repeticao.redemptionId)).toBe(
+      String(reservas[0]._id)
+    );
+  } finally {
+    await CouponRedemption.deleteMany({
+      couponId: cupom._id,
+    });
+
+    await Coupon.deleteOne({
+      _id: cupom._id,
+    });
+  }
+});
+
   it("não duplica a reserva do mesmo pedido", async () => {
     const agora = Date.now();
 
