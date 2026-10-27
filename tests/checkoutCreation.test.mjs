@@ -388,6 +388,199 @@ describe("Criação transacional do checkout", () => {
     expect(variacao.estoqueReservado).toBe(2);
   });
 
+
+  it("rejeita reutilização da chave com cupom diferente", async () => {
+    const usuario = await criarUsuario();
+
+    const produto = await criarProduto({
+      estoque: 10,
+      precoCentavos: 2000,
+    });
+
+    const itens = [itemCarrinho(produto, 2)];
+
+    await criarCarrinho(usuario, itens);
+
+    const chave = "checkout-conflito-cupom-001";
+
+    const parametros = parametrosCheckout(
+      usuario,
+      chave,
+      itens,
+      null
+    );
+
+    const primeiroPedido = await criarPedidoCheckout(
+      parametros
+    );
+
+    expect(primeiroPedido.couponId).toBeNull();
+    expect(primeiroPedido.descontoCentavos).toBe(0);
+
+    // Simula uma nova intenção de compra com outro cupom.
+    // Não é necessário criar um cupom real: a chave deve
+    // ser rejeitada antes de consultar ou reservar cupons.
+    const outroCupomId = new mongoose.Types.ObjectId();
+
+    await expect(
+      criarPedidoCheckout({
+        ...parametros,
+        couponId: outroCupomId,
+      })
+    ).rejects.toThrow("Conflito de idempotência.");
+
+    const pedidos = await Order.find({
+      userId: usuario._id,
+      checkoutIdempotencyKey: chave,
+    });
+
+    expect(pedidos).toHaveLength(1);
+    expect(String(pedidos[0]._id)).toBe(
+      String(primeiroPedido._id)
+    );
+
+    const produtoAtualizado = await Product.findById(
+      produto._id
+    );
+
+    const variacao = produtoAtualizado.variacoes.id(
+      produto.variacoes[0]._id
+    );
+
+    expect(variacao.estoqueDisponivel).toBe(8);
+    expect(variacao.estoqueReservado).toBe(2);
+  });
+
+
+it("rejeita checkout divergente do carrinho persistido", async () => {
+  const usuario = await criarUsuario();
+
+  const produto = await criarProduto({
+    estoque: 10,
+    precoCentavos: 2000,
+  });
+
+  // O carrinho persistido contém 2 unidades.
+  await criarCarrinho(usuario, [
+    itemCarrinho(produto, 2),
+  ]);
+
+  // A solicitação tenta comprar 3 unidades.
+  const parametros = parametrosCheckout(
+    usuario,
+    "checkout-carrinho-divergente-001",
+    [itemCarrinho(produto, 3)]
+  );
+
+  await expect(
+    criarPedidoCheckout(parametros)
+  ).rejects.toThrow(
+    "A solicitação de checkout não corresponde ao carrinho."
+  );
+
+  const pedidos = await Order.countDocuments({
+    userId: usuario._id,
+    checkoutIdempotencyKey:
+      "checkout-carrinho-divergente-001",
+  });
+
+  expect(pedidos).toBe(0);
+
+  const produtoAtualizado = await Product.findById(
+    produto._id
+  );
+
+  const variacao = produtoAtualizado.variacoes.id(
+    produto.variacoes[0]._id
+  );
+
+  expect(variacao.estoqueDisponivel).toBe(10);
+  expect(variacao.estoqueReservado).toBe(0);
+
+  const carrinhoPersistido = await Cart.findOne({
+    userId: usuario._id,
+  });
+
+  expect(carrinhoPersistido).not.toBeNull();
+  expect(carrinhoPersistido.itens).toHaveLength(1);
+  expect(carrinhoPersistido.itens[0].quantidade).toBe(2);
+});
+
+
+it("rejeita reutilização de pedido legado sem fingerprint", async () => {
+  const usuario = await criarUsuario();
+
+  const produto = await criarProduto({
+    estoque: 10,
+    precoCentavos: 2000,
+  });
+
+  const itens = [itemCarrinho(produto, 2)];
+
+  await criarCarrinho(usuario, itens);
+
+  const chave = "checkout-pedido-legado-001";
+
+  const parametros = parametrosCheckout(
+    usuario,
+    chave,
+    itens
+  );
+
+  // Cria um pedido válido pela API do serviço.
+  const pedidoOriginal = await criarPedidoCheckout(
+    parametros
+  );
+
+  expect(pedidoOriginal.checkoutRequestFingerprint)
+    .toMatch(/^[a-f0-9]{64}$/);
+
+  // Simula um pedido legado, anterior à existência
+  // do campo checkoutRequestFingerprint.
+  await Order.collection.updateOne(
+    { _id: pedidoOriginal._id },
+    { $unset: { checkoutRequestFingerprint: "" } }
+  );
+
+  const pedidoLegado = await Order.findById(
+    pedidoOriginal._id
+  );
+
+  expect(pedidoLegado.checkoutRequestFingerprint)
+    .toBeUndefined();
+
+  // A mesma chave não pode ser reutilizada sem
+  // comprovação da intenção original de compra.
+  await expect(
+    criarPedidoCheckout(parametros)
+  ).rejects.toThrow("Conflito de idempotência.");
+
+  const pedidos = await Order.find({
+    userId: usuario._id,
+    checkoutIdempotencyKey: chave,
+  });
+
+  expect(pedidos).toHaveLength(1);
+  expect(String(pedidos[0]._id)).toBe(
+    String(pedidoOriginal._id)
+  );
+
+  expect(pedidos[0].checkoutRequestFingerprint)
+    .toBeUndefined();
+
+  const produtoAtualizado = await Product.findById(
+    produto._id
+  );
+
+  const variacao = produtoAtualizado.variacoes.id(
+    produto.variacoes[0]._id
+  );
+
+  expect(variacao.estoqueDisponivel).toBe(8);
+  expect(variacao.estoqueReservado).toBe(2);
+});
+
+
   it("não duplica pedidos em requisições simultâneas", async () => {
     const usuario = await criarUsuario();
 
