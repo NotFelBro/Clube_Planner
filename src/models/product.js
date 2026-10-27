@@ -106,18 +106,38 @@ const productSchema = new mongoose.Schema(
             variacoes.length > 0,
           message: "O produto deve possuir ao menos uma variação.",
         },
-        {
-          validator: (variacoes) => {
-            if (!Array.isArray(variacoes)) return false;
+        
+{
+  validator: (variacoes) => {
+    if (!Array.isArray(variacoes)) {
+      return false;
+    }
 
-            const skus = variacoes.map((item) =>
-              item.sku.trim().toUpperCase()
-            );
+    const skus = [];
 
-            return new Set(skus).size === skus.length;
-          },
-          message: "Não são permitidos SKUs repetidos no produto.",
-        },
+    for (const variacao of variacoes) {
+      if (
+        !variacao ||
+        typeof variacao.sku !== "string"
+      ) {
+        return false;
+      }
+
+      const sku = variacao.sku.trim().toUpperCase();
+
+      if (!sku) {
+        return false;
+      }
+
+      skus.push(sku);
+    }
+
+    return new Set(skus).size === skus.length;
+  },
+  message:
+    "As variações devem possuir SKUs válidos e únicos.",
+},
+
       ],
     },
 

@@ -1,26 +1,31 @@
 
 const mongoose = require("mongoose");
 
-const cartItemSchema = new mongoose.Schema(
+const { Schema } = mongoose;
+
+const inteiroPositivo = (valor) =>
+  Number.isSafeInteger(valor) && valor > 0;
+
+const cartItemSchema = new Schema(
   {
     productId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "Product",
       required: true,
     },
 
     variantId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       required: true,
     },
 
     quantidade: {
       type: Number,
       required: true,
-      min: 1,
       validate: {
-        validator: Number.isSafeInteger,
-        message: "A quantidade deve ser inteira.",
+        validator: inteiroPositivo,
+        message:
+          "A quantidade deve ser um inteiro positivo.",
       },
     },
   },
@@ -29,10 +34,10 @@ const cartItemSchema = new mongoose.Schema(
   }
 );
 
-const cartSchema = new mongoose.Schema(
+const cartSchema = new Schema(
   {
     userId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
       immutable: true,
@@ -43,19 +48,33 @@ const cartSchema = new mongoose.Schema(
       default: [],
       validate: {
         validator: (itens) => {
-          const chaves = itens.map(
-            (item) =>
-              `${item.productId}:${item.variantId}`
-          );
+          if (!Array.isArray(itens)) {
+            return false;
+          }
 
-          return new Set(chaves).size === chaves.length;
+          const chaves = itens.map((item) => {
+            if (!item.productId || !item.variantId) {
+              return null;
+            }
+
+            return `${item.productId}:${item.variantId}`;
+          });
+
+          if (chaves.includes(null)) {
+            return false;
+          }
+
+          return (
+            new Set(chaves).size === chaves.length
+          );
         },
-        message: "Existem itens duplicados no carrinho.",
+        message:
+          "O carrinho contém itens duplicados ou inválidos.",
       },
     },
 
     couponId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "Coupon",
       default: null,
     },
@@ -73,7 +92,6 @@ cartSchema.index(
   { unique: true }
 );
 
-module.exports = mongoose.model(
-  "Cart",
-  cartSchema
-);
+module.exports =
+  mongoose.models.Cart ||
+  mongoose.model("Cart", cartSchema);

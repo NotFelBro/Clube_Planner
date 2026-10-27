@@ -1,17 +1,19 @@
 
 const mongoose = require("mongoose");
 
-const paymentSchema = new mongoose.Schema(
+const { Schema } = mongoose;
+
+const paymentSchema = new Schema(
   {
     orderId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "Order",
       required: true,
       immutable: true,
     },
 
     userId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
       immutable: true,
@@ -28,27 +30,34 @@ const paymentSchema = new mongoose.Schema(
     providerPaymentId: {
       type: String,
       default: null,
+      trim: true,
     },
 
     idempotencyKey: {
       type: String,
       required: true,
       immutable: true,
+      trim: true,
+      minlength: 8,
+      maxlength: 128,
     },
 
     metodo: {
       type: String,
       enum: ["pix", "cartao", "boleto"],
       required: true,
+      immutable: true,
     },
 
     valorCentavos: {
       type: Number,
       required: true,
-      min: 1,
+      immutable: true,
       validate: {
-        validator: Number.isSafeInteger,
-        message: "Valor de pagamento inválido.",
+        validator: (valor) =>
+          Number.isSafeInteger(valor) && valor > 0,
+        message:
+          "Valor de pagamento deve ser um inteiro positivo.",
       },
     },
 
@@ -63,12 +72,14 @@ const paymentSchema = new mongoose.Schema(
         "cancelado",
         "reembolsado",
       ],
+      required: true,
       default: "criado",
     },
 
     providerStatus: {
       type: String,
       default: null,
+      trim: true,
     },
 
     aprovadoEm: {
@@ -93,9 +104,40 @@ const paymentSchema = new mongoose.Schema(
   }
 );
 
-// Uma chave única por tentativa de pagamento.
+// Validações de consistência documental.
+paymentSchema.pre("validate", function () {
+  if (this.status === "aprovado" && !this.aprovadoEm) {
+    this.invalidate(
+      "aprovadoEm",
+      "Pagamento aprovado exige data de aprovação."
+    );
+  }
+
+  if (
+    this.aprovadoEm &&
+    !["aprovado", "reembolsado"].includes(this.status)
+  ) {
+    this.invalidate(
+      "aprovadoEm",
+      "Data de aprovação incompatível com o status."
+    );
+  }
+
+  if (
+    this.expiraEm &&
+    this.createdAt &&
+    this.expiraEm <= this.createdAt
+  ) {
+    this.invalidate(
+      "expiraEm",
+      "Expiração deve ser posterior à criação."
+    );
+  }
+});
+
+// Uma chave de idempotência por provedor.
 paymentSchema.index(
-  { idempotencyKey: 1 },
+  { provider: 1, idempotencyKey: 1 },
   { unique: true }
 );
 
@@ -122,7 +164,6 @@ paymentSchema.index({
   updatedAt: 1,
 });
 
-module.exports = mongoose.model(
-  "Payment",
-  paymentSchema
-);
+module.exports =
+  mongoose.models.Payment ||
+  mongoose.model("Payment", paymentSchema);

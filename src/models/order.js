@@ -143,6 +143,13 @@ const orderSchema = new Schema(
       maxlength: 128,
     },
 
+    checkoutRequestFingerprint: {
+  type: String,
+  required: false,
+  immutable: true,
+  match: /^[a-f0-9]{64}$/,
+},
+
 
 enderecoOrigemId: {
   type: Schema.Types.ObjectId,

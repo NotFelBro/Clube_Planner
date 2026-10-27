@@ -389,9 +389,61 @@ async function excluirEndereco(userId, enderecoId) {
   return atualizado.enderecos;
 }
 
+
+/**
+ * Obtém um snapshot do endereço para o checkout.
+ *
+ * O endereço precisa pertencer ao usuário ativo.
+ * A leitura pode participar da transação MongoDB.
+ */
+async function obterEnderecoParaCheckout({
+  userId,
+  enderecoId,
+  session,
+}) {
+  const usuarioId = obterObjectId(userId);
+  const id = obterObjectId(enderecoId);
+
+  if (!session) {
+    throw new Error("Sessão MongoDB obrigatória.");
+  }
+
+  const usuario = await User.findOne({
+    _id: usuarioId,
+    ativo: true,
+    "enderecos._id": id,
+  })
+    .select("enderecos")
+    .session(session);
+
+  if (!usuario) {
+    throw new Error(
+      "Endereço não encontrado para este usuário."
+    );
+  }
+
+  const endereco = usuario.enderecos.id(id);
+
+  if (!endereco) {
+    throw new Error("Endereço não encontrado.");
+  }
+
+  return {
+    cep: endereco.cep,
+    logradouro: endereco.logradouro,
+    numero: endereco.numero,
+    complemento: endereco.complemento || "",
+    bairro: endereco.bairro,
+    cidade: endereco.cidade,
+    estado: endereco.estado,
+  };
+}
+
+
 module.exports = {
   adicionarEndereco,
   definirEnderecoPrincipal,
   editarEndereco,
   excluirEndereco,
+  obterEnderecoParaCheckout,
 };

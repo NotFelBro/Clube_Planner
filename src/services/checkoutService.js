@@ -15,8 +15,12 @@ const {
   calcularDesconto,
 } = require("./discountService");
 
+const {
+  calcularCheckoutFingerprint,
+} = require("./checkoutFingerprint");
+
 /**
- * Executa operações dentro de uma transação MongoDB.
+ * Executa uma operação dentro de uma transação MongoDB.
  */
 async function executarTransacao(operacao) {
   if (typeof operacao !== "function") {
@@ -47,7 +51,10 @@ async function reservarEstoque({
     throw new Error("Sessão MongoDB obrigatória.");
   }
 
-  if (!Number.isSafeInteger(quantidade) || quantidade <= 0) {
+  if (
+    !Number.isSafeInteger(quantidade) ||
+    quantidade <= 0
+  ) {
     throw new Error("Quantidade inválida.");
   }
 
@@ -66,7 +73,9 @@ async function reservarEstoque({
         $elemMatch: {
           _id: variantId,
           ativo: true,
-          estoqueDisponivel: { $gte: quantidade },
+          estoqueDisponivel: {
+            $gte: quantidade,
+          },
         },
       },
     },
@@ -111,8 +120,8 @@ async function reservarCupom({
   }
 
   if (
-    ![couponId, userId, orderId].every(
-      (id) => mongoose.isObjectIdOrHexString(id)
+    ![couponId, userId, orderId].every((id) =>
+      mongoose.isObjectIdOrHexString(id)
     )
   ) {
     throw new Error("Identificador inválido.");
@@ -290,7 +299,9 @@ async function consumirCupom({ redemptionId, session }) {
   ).session(session);
 
   if (!reserva) {
-    throw new Error("Reserva de cupom não encontrada.");
+    throw new Error(
+      "Reserva de cupom não encontrada."
+    );
   }
 
   if (reserva.status === "consumed") {
@@ -380,7 +391,9 @@ async function liberarCupom({ redemptionId, session }) {
   ).session(session);
 
   if (!reserva) {
-    throw new Error("Reserva de cupom não encontrada.");
+    throw new Error(
+      "Reserva de cupom não encontrada."
+    );
   }
 
   if (reserva.status === "released") {
@@ -447,13 +460,16 @@ async function liberarCupom({ redemptionId, session }) {
 }
 
 /**
- * Valida se o endereço de uma nova solicitação
- * corresponde ao endereço original do pedido.
+ * Valida a reutilização de uma chave de idempotência.
  *
- * Pedidos antigos sem enderecoOrigemId
+ * Pedidos antigos sem fingerprint ou enderecoOrigemId
  * são rejeitados de forma conservadora.
  */
-function validarIdempotenciaEndereco(pedido, enderecoId) {
+function validarIdempotenciaCheckout(
+  pedido,
+  enderecoId,
+  fingerprint
+) {
   if (!pedido) {
     return;
   }
@@ -464,18 +480,27 @@ function validarIdempotenciaEndereco(pedido, enderecoId) {
   ) {
     throw new Error("Conflito de idempotência.");
   }
+
+  if (
+    !pedido.checkoutRequestFingerprint ||
+    pedido.checkoutRequestFingerprint !== fingerprint
+  ) {
+    throw new Error("Conflito de idempotência.");
+  }
 }
 
 /**
  * Cria um pedido de checkout de forma transacional.
  *
- * Nesta etapa, o frete provisório é permitido
- * exclusivamente no banco de testes.
+ * O frete provisório é permitido exclusivamente
+ * no banco de testes.
  */
 async function criarPedidoCheckout({
   userId,
   enderecoId,
   checkoutIdempotencyKey,
+  itens,
+  couponId,
 }) {
   // 1. Validar os identificadores.
   if (
@@ -496,7 +521,27 @@ async function criarPedidoCheckout({
 
   const chave = checkoutIdempotencyKey.trim();
 
-  // 3. Bloquear frete fictício fora dos testes.
+  // 3. Validar os itens solicitados.
+  if (!Array.isArray(itens) || itens.length === 0) {
+    throw new Error(
+      "Itens do checkout obrigatórios."
+    );
+  }
+
+  if (couponId === undefined) {
+    throw new Error(
+      "Cupom do checkout deve ser informado."
+    );
+  }
+
+  // 4. Calcular o fingerprint da solicitação.
+  const fingerprint = calcularCheckoutFingerprint({
+    enderecoId,
+    itens,
+    couponId,
+  });
+
+  // 5. Bloquear frete fictício fora dos testes.
   if (
     process.env.NODE_ENV !== "test" ||
     mongoose.connection.name !== "clube_planner_test"
@@ -518,9 +563,10 @@ async function criarPedidoCheckout({
   );
 
   if (pedidoExistente) {
-    validarIdempotenciaEndereco(
+    validarIdempotenciaCheckout(
       pedidoExistente,
-      enderecoId
+      enderecoId,
+      fingerprint
     );
 
     return pedidoExistente;
@@ -535,15 +581,16 @@ async function criarPedidoCheckout({
       ).session(session);
 
       if (existente) {
-        validarIdempotenciaEndereco(
+        validarIdempotenciaCheckout(
           existente,
-          enderecoId
+          enderecoId,
+          fingerprint
         );
 
         return existente;
       }
 
-      // 4. Consultar o carrinho.
+      // 6. Consultar o carrinho.
       const carrinho = await Cart.findOne({
         userId,
       }).session(session);
@@ -553,10 +600,31 @@ async function criarPedidoCheckout({
         !Array.isArray(carrinho.itens) ||
         carrinho.itens.length === 0
       ) {
-        throw new Error("Carrinho vazio ou inexistente.");
+        throw new Error(
+          "Carrinho vazio ou inexistente."
+        );
       }
 
-      // 5. Obter o endereço de entrega.
+      // 7. Verificar se a solicitação corresponde
+      // ao carrinho persistido.
+      const fingerprintCarrinho =
+        calcularCheckoutFingerprint({
+          enderecoId,
+          itens: carrinho.itens.map((item) => ({
+            productId: item.productId,
+            variantId: item.variantId,
+            quantidade: item.quantidade,
+          })),
+          couponId: carrinho.couponId ?? null,
+        });
+
+      if (fingerprintCarrinho !== fingerprint) {
+        throw new Error(
+          "A solicitação de checkout não corresponde ao carrinho."
+        );
+      }
+
+      // 8. Obter o endereço de entrega.
       const enderecoEntrega =
         await obterEnderecoParaCheckout({
           userId,
@@ -567,7 +635,7 @@ async function criarPedidoCheckout({
       const itensPedido = [];
       let subtotalCentavos = 0;
 
-      // 6. Validar produtos e reservar estoque.
+      // 9. Validar produtos e reservar estoque.
       // Operações sequenciais dentro da sessão.
       for (const item of carrinho.itens) {
         if (
@@ -649,14 +717,14 @@ async function criarPedidoCheckout({
         });
       }
 
-      // 7. Preparar o pedido.
+      // 10. Preparar o pedido.
       const orderId = new mongoose.Types.ObjectId();
 
       let descontoCentavos = 0;
-      let couponId = null;
+      let couponIdPedido = null;
       let codigoCupom = null;
 
-      // 8. Reservar cupom, se existir.
+      // 11. Reservar cupom, se existir.
       if (carrinho.couponId) {
         const reservaCupom = await reservarCupom({
           couponId: carrinho.couponId,
@@ -672,11 +740,11 @@ async function criarPedidoCheckout({
           valor: reservaCupom.valor,
         });
 
-        couponId = reservaCupom.couponId;
+        couponIdPedido = reservaCupom.couponId;
         codigoCupom = reservaCupom.codigo;
       }
 
-      // 9. Calcular o total.
+      // 12. Calcular o total.
       // Frete provisório: somente no ambiente de testes.
       const freteCentavos = 0;
 
@@ -689,17 +757,18 @@ async function criarPedidoCheckout({
         !Number.isSafeInteger(totalCentavos) ||
         totalCentavos < 0
       ) {
-        throw new Error("Total do pedido inválido.");
+        throw new Error(
+          "Total do pedido inválido."
+        );
       }
 
-      // 10. Definir o prazo da reserva.
-      // Margem de segurança para o limite de
-      // 15 minutos validado pelo modelo Order.
+      // 13. Definir o prazo da reserva.
+      // Margem de segurança para o limite de 15 minutos.
       const expiresAt = new Date(
         Date.now() + 14 * 60 * 1000
       );
 
-      // 11. Criar o pedido na mesma transação.
+      // 14. Criar o pedido na mesma transação.
       const [pedido] = await Order.create(
         [
           {
@@ -707,8 +776,8 @@ async function criarPedidoCheckout({
             userId,
 
             checkoutIdempotencyKey: chave,
+            checkoutRequestFingerprint: fingerprint,
 
-            // Identificador original do endereço.
             enderecoOrigemId: enderecoId,
 
             itens: itensPedido,
@@ -719,7 +788,7 @@ async function criarPedidoCheckout({
             freteCentavos,
             totalCentavos,
 
-            couponId,
+            couponId: couponIdPedido,
             codigoCupom,
 
             status: "aguardando_pagamento",
@@ -737,17 +806,18 @@ async function criarPedidoCheckout({
     });
   } catch (erro) {
     // CAMINHO 3:
-    // Se outra requisição criou o mesmo pedido,
-    // tentar recuperá-lo após erro de índice único.
+    // Recuperar pedido criado por outra requisição
+    // após erro de índice único.
     if (erro?.code === 11000) {
       const existente = await Order.findOne(
         filtroIdempotencia
       );
 
       if (existente) {
-        validarIdempotenciaEndereco(
+        validarIdempotenciaCheckout(
           existente,
-          enderecoId
+          enderecoId,
+          fingerprint
         );
 
         return existente;

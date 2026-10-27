@@ -26,7 +26,6 @@ const {
 
 const usuariosCriados = [];
 const produtosCriados = [];
-const pedidosCriados = [];
 
 function obterUriTeste() {
   const uri = process.env.MONGODB_TEST_URI;
@@ -124,11 +123,28 @@ function itemCarrinho(produto, quantidade) {
   };
 }
 
-function parametrosCheckout(usuario, chave) {
+function parametrosCheckout(
+  usuario,
+  chave,
+  itens,
+  couponId = null
+) {
+  if (!Array.isArray(itens) || itens.length === 0) {
+    throw new Error(
+      "O teste deve informar os itens do checkout."
+    );
+  }
+
   return {
     userId: usuario._id,
     enderecoId: usuario.enderecos[0]._id,
     checkoutIdempotencyKey: chave,
+    itens: itens.map((item) => ({
+      productId: item.productId,
+      variantId: item.variantId,
+      quantidade: item.quantidade,
+    })),
+    couponId,
   };
 }
 
@@ -161,10 +177,12 @@ afterEach(async () => {
     mongoose.connection.readyState !== 1 ||
     mongoose.connection.name !== "clube_planner_test"
   ) {
-    throw new Error("Limpeza bloqueada: banco inesperado.");
+    throw new Error(
+      "Limpeza bloqueada: banco inesperado."
+    );
   }
 
-  // Limpeza limitada aos registros deste arquivo.
+  // Limpeza limitada aos registros criados pelos testes.
   if (usuariosCriados.length > 0) {
     await Cart.deleteMany({
       userId: { $in: usuariosCriados },
@@ -187,7 +205,6 @@ afterEach(async () => {
 
   usuariosCriados.length = 0;
   produtosCriados.length = 0;
-  pedidosCriados.length = 0;
 });
 
 afterAll(async () => {
@@ -206,11 +223,10 @@ describe("Criação transacional do checkout", () => {
     const pedido = await criarPedidoCheckout(
       parametrosCheckout(
         usuario,
-        "checkout-integracao-001"
+        "checkout-integracao-001",
+        [itemCarrinho(produto, 2)]
       )
     );
-
-    pedidosCriados.push(pedido._id);
 
     expect(pedido.status).toBe("aguardando_pagamento");
     expect(pedido.reserva.status).toBe("reservado");
@@ -252,123 +268,242 @@ describe("Criação transacional do checkout", () => {
     );
 
     expect(persistido).not.toBeNull();
+    expect(persistido.checkoutRequestFingerprint)
+      .toMatch(/^[a-f0-9]{64}$/);
   });
 
+  it("reutiliza o pedido original após alteração do carrinho", async () => {
+    const usuario = await criarUsuario();
 
-it("não duplica pedidos em requisições simultâneas", async () => {
-  const usuario = await criarUsuario();
+    const produto = await criarProduto({
+      estoque: 10,
+      precoCentavos: 2000,
+    });
 
-  const produto = await criarProduto({
-    estoque: 5,
-    precoCentavos: 2000,
-  });
+    await criarCarrinho(usuario, [
+      itemCarrinho(produto, 2),
+    ]);
 
-  await criarCarrinho(usuario, [
-    itemCarrinho(produto, 2),
-  ]);
+    const parametros = parametrosCheckout(
+      usuario,
+      "checkout-carrinho-alterado-001",
+      [itemCarrinho(produto, 2)]
+    );
 
-  const parametros = parametrosCheckout(
-    usuario,
-    "checkout-concorrencia-001"
-  );
+    const primeiroPedido = await criarPedidoCheckout(
+      parametros
+    );
 
-  // Duas chamadas simultâneas com a mesma chave.
-  const resultados = await Promise.allSettled([
-    criarPedidoCheckout(parametros),
-    criarPedidoCheckout(parametros),
-  ]);
+    expect(primeiroPedido.itens[0].quantidade).toBe(2);
 
-  const aprovados = resultados.filter(
-    (resultado) => resultado.status === "fulfilled"
-  );
+    await Cart.updateOne(
+      { userId: usuario._id },
+      {
+        $set: {
+          "itens.0.quantidade": 3,
+        },
+      }
+    );
 
-  const rejeitados = resultados.filter(
-    (resultado) => resultado.status === "rejected"
-  );
+    const segundoPedido = await criarPedidoCheckout(
+      parametros
+    );
 
-  // Diagnóstico: ambas devem obter o mesmo pedido.
-  expect(
-    rejeitados.map((resultado) => resultado.reason?.message)
-  ).toEqual([]);
+    expect(String(segundoPedido._id)).toBe(
+      String(primeiroPedido._id)
+    );
 
-  expect(aprovados).toHaveLength(2);
+    expect(segundoPedido.itens[0].quantidade).toBe(2);
 
-  const ids = aprovados.map(
-    (resultado) => String(resultado.value._id)
-  );
+    const produtoAtualizado = await Product.findById(
+      produto._id
+    );
 
-  expect(new Set(ids).size).toBe(1);
+    const variacao = produtoAtualizado.variacoes.id(
+      produto.variacoes[0]._id
+    );
 
-  const pedidos = await Order.find({
-    userId: usuario._id,
-    checkoutIdempotencyKey: "checkout-concorrencia-001",
-  });
+    expect(variacao.estoqueDisponivel).toBe(8);
+    expect(variacao.estoqueReservado).toBe(2);
 
-  expect(pedidos).toHaveLength(1);
-
-  const atualizado = await Product.findById(
-    produto._id
-  );
-
-  const variacao = atualizado.variacoes.id(
-    produto.variacoes[0]._id
-  );
-
-  // Duas chamadas não podem reservar quatro unidades.
-  expect(variacao.estoqueDisponivel).toBe(3);
-  expect(variacao.estoqueReservado).toBe(2);
-});
-
-
-it("detecta reutilização da chave com endereço diferente", async () => {
-  const usuario = await criarUsuario();
-  const produto = await criarProduto();
-
-  await criarCarrinho(usuario, [
-    itemCarrinho(produto, 2),
-  ]);
-
-  const chave = "checkout-conflito-endereco-001";
-
-  const primeiro = await criarPedidoCheckout(
-    parametrosCheckout(usuario, chave)
-  );
-
-  const outroEnderecoId =
-    new mongoose.Types.ObjectId();
-
-  await expect(
-    criarPedidoCheckout({
+    const quantidadePedidos = await Order.countDocuments({
       userId: usuario._id,
-      enderecoId: outroEnderecoId,
-      checkoutIdempotencyKey: chave,
-    })
-  ).rejects.toThrow(
-    "Conflito de idempotência."
-  );
+      checkoutIdempotencyKey:
+        "checkout-carrinho-alterado-001",
+    });
 
-  const pedidos = await Order.find({
-    userId: usuario._id,
-    checkoutIdempotencyKey: chave,
+    expect(quantidadePedidos).toBe(1);
   });
 
-  expect(pedidos).toHaveLength(1);
-  expect(String(pedidos[0]._id)).toBe(
-    String(primeiro._id)
-  );
+  it("rejeita a mesma chave com uma nova intenção de compra", async () => {
+    const usuario = await criarUsuario();
 
-  const atualizado = await Product.findById(
-    produto._id
-  );
+    const produto = await criarProduto({
+      estoque: 10,
+      precoCentavos: 2000,
+    });
 
-  const variacao = atualizado.variacoes.id(
-    produto.variacoes[0]._id
-  );
+    await criarCarrinho(usuario, [
+      itemCarrinho(produto, 2),
+    ]);
 
-  expect(variacao.estoqueDisponivel).toBe(3);
-  expect(variacao.estoqueReservado).toBe(2);
-});
+    const parametros = parametrosCheckout(
+      usuario,
+      "checkout-conflito-intencao-001",
+      [itemCarrinho(produto, 2)]
+    );
 
+    const primeiroPedido = await criarPedidoCheckout(
+      parametros
+    );
+
+    expect(primeiroPedido.itens[0].quantidade).toBe(2);
+
+    const novaSolicitacao = {
+      ...parametros,
+      itens: [itemCarrinho(produto, 3)],
+    };
+
+    await expect(
+      criarPedidoCheckout(novaSolicitacao)
+    ).rejects.toThrow("Conflito de idempotência.");
+
+    const pedidos = await Order.countDocuments({
+      userId: usuario._id,
+      checkoutIdempotencyKey:
+        "checkout-conflito-intencao-001",
+    });
+
+    expect(pedidos).toBe(1);
+
+    const produtoAtualizado = await Product.findById(
+      produto._id
+    );
+
+    const variacao = produtoAtualizado.variacoes.id(
+      produto.variacoes[0]._id
+    );
+
+    expect(variacao.estoqueDisponivel).toBe(8);
+    expect(variacao.estoqueReservado).toBe(2);
+  });
+
+  it("não duplica pedidos em requisições simultâneas", async () => {
+    const usuario = await criarUsuario();
+
+    const produto = await criarProduto({
+      estoque: 5,
+      precoCentavos: 2000,
+    });
+
+    await criarCarrinho(usuario, [
+      itemCarrinho(produto, 2),
+    ]);
+
+    const parametros = parametrosCheckout(
+      usuario,
+      "checkout-concorrencia-001",
+      [itemCarrinho(produto, 2)]
+    );
+
+    const resultados = await Promise.allSettled([
+      criarPedidoCheckout(parametros),
+      criarPedidoCheckout(parametros),
+    ]);
+
+    const aprovados = resultados.filter(
+      (resultado) => resultado.status === "fulfilled"
+    );
+
+    const rejeitados = resultados.filter(
+      (resultado) => resultado.status === "rejected"
+    );
+
+    expect(
+      rejeitados.map(
+        (resultado) => resultado.reason?.message
+      )
+    ).toEqual([]);
+
+    expect(aprovados).toHaveLength(2);
+
+    const ids = aprovados.map(
+      (resultado) => String(resultado.value._id)
+    );
+
+    expect(new Set(ids).size).toBe(1);
+
+    const pedidos = await Order.find({
+      userId: usuario._id,
+      checkoutIdempotencyKey:
+        "checkout-concorrencia-001",
+    });
+
+    expect(pedidos).toHaveLength(1);
+
+    const atualizado = await Product.findById(
+      produto._id
+    );
+
+    const variacao = atualizado.variacoes.id(
+      produto.variacoes[0]._id
+    );
+
+    expect(variacao.estoqueDisponivel).toBe(3);
+    expect(variacao.estoqueReservado).toBe(2);
+  });
+
+  it("detecta reutilização da chave com endereço diferente", async () => {
+    const usuario = await criarUsuario();
+    const produto = await criarProduto();
+
+    await criarCarrinho(usuario, [
+      itemCarrinho(produto, 2),
+    ]);
+
+    const chave = "checkout-conflito-endereco-001";
+
+    const parametros = parametrosCheckout(
+      usuario,
+      chave,
+      [itemCarrinho(produto, 2)]
+    );
+
+    const primeiro = await criarPedidoCheckout(
+      parametros
+    );
+
+    const outroEnderecoId =
+      new mongoose.Types.ObjectId();
+
+    await expect(
+      criarPedidoCheckout({
+        ...parametros,
+        enderecoId: outroEnderecoId,
+      })
+    ).rejects.toThrow("Conflito de idempotência.");
+
+    const pedidos = await Order.find({
+      userId: usuario._id,
+      checkoutIdempotencyKey: chave,
+    });
+
+    expect(pedidos).toHaveLength(1);
+    expect(String(pedidos[0]._id)).toBe(
+      String(primeiro._id)
+    );
+
+    const atualizado = await Product.findById(
+      produto._id
+    );
+
+    const variacao = atualizado.variacoes.id(
+      produto.variacoes[0]._id
+    );
+
+    expect(variacao.estoqueDisponivel).toBe(3);
+    expect(variacao.estoqueReservado).toBe(2);
+  });
 
   it("reutiliza a mesma chave sem duplicar reservas", async () => {
     const usuario = await criarUsuario();
@@ -380,14 +515,13 @@ it("detecta reutilização da chave com endereço diferente", async () => {
 
     const parametros = parametrosCheckout(
       usuario,
-      "checkout-integracao-002"
+      "checkout-integracao-002",
+      [itemCarrinho(produto, 2)]
     );
 
     const primeiro = await criarPedidoCheckout(
       parametros
     );
-
-    pedidosCriados.push(primeiro._id);
 
     const segundo = await criarPedidoCheckout(
       parametros
@@ -419,6 +553,7 @@ it("detecta reutilização da chave com endereço diferente", async () => {
 
   it("rejeita checkout com estoque insuficiente", async () => {
     const usuario = await criarUsuario();
+
     const produto = await criarProduto({
       estoque: 1,
     });
@@ -431,7 +566,8 @@ it("detecta reutilização da chave com endereço diferente", async () => {
       criarPedidoCheckout(
         parametrosCheckout(
           usuario,
-          "checkout-integracao-003"
+          "checkout-integracao-003",
+          [itemCarrinho(produto, 2)]
         )
       )
     ).rejects.toThrow(
@@ -467,16 +603,19 @@ it("detecta reutilização da chave com endereço diferente", async () => {
       estoque: 1,
     });
 
-    await criarCarrinho(usuario, [
+    const itens = [
       itemCarrinho(produtoDisponivel, 2),
       itemCarrinho(produtoInsuficiente, 3),
-    ]);
+    ];
+
+    await criarCarrinho(usuario, itens);
 
     await expect(
       criarPedidoCheckout(
         parametrosCheckout(
           usuario,
-          "checkout-integracao-004"
+          "checkout-integracao-004",
+          itens
         )
       )
     ).rejects.toThrow(
