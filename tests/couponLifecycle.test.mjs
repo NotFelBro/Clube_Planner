@@ -134,6 +134,58 @@ describe("Ciclo de vida de cupons", () => {
     }
   });
 
+
+it("impede consumo e liberação simultâneos da mesma reserva", async () => {
+  const { couponId, redemptionId } = await criarCenario();
+
+  try {
+    const resultados = await Promise.allSettled([
+      executarTransacao((session) =>
+        consumirCupom({ redemptionId, session })
+      ),
+      executarTransacao((session) =>
+        liberarCupom({ redemptionId, session })
+      ),
+    ]);
+
+    const aprovadas = resultados.filter(
+      (resultado) => resultado.status === "fulfilled"
+    );
+
+    const rejeitadas = resultados.filter(
+      (resultado) => resultado.status === "rejected"
+    );
+
+    // Apenas uma transição pode prevalecer.
+    expect(aprovadas).toHaveLength(1);
+    expect(rejeitadas).toHaveLength(1);
+
+    const cupom = await Coupon.findById(couponId);
+    const reserva = await CouponRedemption.findById(
+      redemptionId
+    );
+
+    expect(cupom.usosReservados).toBe(0);
+
+    if (reserva.status === "consumed") {
+      expect(cupom.usosRealizados).toBe(1);
+      expect(reserva.consumedAt).not.toBeNull();
+      expect(reserva.releasedAt).toBeNull();
+    } else if (reserva.status === "released") {
+      expect(cupom.usosRealizados).toBe(0);
+      expect(reserva.releasedAt).not.toBeNull();
+      expect(reserva.consumedAt).toBeNull();
+    } else {
+      throw new Error(
+        `Estado inesperado da reserva: ${reserva.status}`
+      );
+    }
+  } finally {
+    await limparCenario(couponId);
+  }
+});
+
+
   it("libera uma reserva sem consumir o cupom", async () => {
     const { couponId, redemptionId } = await criarCenario();
 

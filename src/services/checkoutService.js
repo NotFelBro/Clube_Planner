@@ -4,6 +4,16 @@ const mongoose = require("mongoose");
 const Product = require("../models/product");
 const Coupon = require("../models/coupons");
 const CouponRedemption = require("../models/couponRedemption");
+const Cart = require("../models/cart");
+const Order = require("../models/order");
+
+const {
+  obterEnderecoParaCheckout,
+} = require("./addressService");
+
+const {
+  calcularDesconto,
+} = require("./discountService");
 
 /**
  * Executa operações dentro de uma transação MongoDB.
@@ -257,7 +267,6 @@ async function reservarCupom({
   };
 }
 
-
 /**
  * Consome uma reserva de cupom.
  *
@@ -437,7 +446,317 @@ async function liberarCupom({ redemptionId, session }) {
   };
 }
 
+/**
+ * Valida se o endereço de uma nova solicitação
+ * corresponde ao endereço original do pedido.
+ *
+ * Pedidos antigos sem enderecoOrigemId
+ * são rejeitados de forma conservadora.
+ */
+function validarIdempotenciaEndereco(pedido, enderecoId) {
+  if (!pedido) {
+    return;
+  }
 
+  if (
+    !pedido.enderecoOrigemId ||
+    String(pedido.enderecoOrigemId) !== String(enderecoId)
+  ) {
+    throw new Error("Conflito de idempotência.");
+  }
+}
+
+/**
+ * Cria um pedido de checkout de forma transacional.
+ *
+ * Nesta etapa, o frete provisório é permitido
+ * exclusivamente no banco de testes.
+ */
+async function criarPedidoCheckout({
+  userId,
+  enderecoId,
+  checkoutIdempotencyKey,
+}) {
+  // 1. Validar os identificadores.
+  if (
+    !mongoose.isObjectIdOrHexString(userId) ||
+    !mongoose.isObjectIdOrHexString(enderecoId)
+  ) {
+    throw new Error("Identificador inválido.");
+  }
+
+  // 2. Validar a chave de idempotência.
+  if (
+    typeof checkoutIdempotencyKey !== "string" ||
+    checkoutIdempotencyKey.trim().length < 8 ||
+    checkoutIdempotencyKey.trim().length > 128
+  ) {
+    throw new Error("Chave de idempotência inválida.");
+  }
+
+  const chave = checkoutIdempotencyKey.trim();
+
+  // 3. Bloquear frete fictício fora dos testes.
+  if (
+    process.env.NODE_ENV !== "test" ||
+    mongoose.connection.name !== "clube_planner_test"
+  ) {
+    throw new Error(
+      "Checkout indisponível: cálculo de frete não configurado."
+    );
+  }
+
+  const filtroIdempotencia = {
+    userId,
+    checkoutIdempotencyKey: chave,
+  };
+
+  // CAMINHO 1:
+  // Verificar se o pedido já existe antes da transação.
+  const pedidoExistente = await Order.findOne(
+    filtroIdempotencia
+  );
+
+  if (pedidoExistente) {
+    validarIdempotenciaEndereco(
+      pedidoExistente,
+      enderecoId
+    );
+
+    return pedidoExistente;
+  }
+
+  try {
+    return await executarTransacao(async (session) => {
+      // CAMINHO 2:
+      // Verificar novamente dentro da transação.
+      const existente = await Order.findOne(
+        filtroIdempotencia
+      ).session(session);
+
+      if (existente) {
+        validarIdempotenciaEndereco(
+          existente,
+          enderecoId
+        );
+
+        return existente;
+      }
+
+      // 4. Consultar o carrinho.
+      const carrinho = await Cart.findOne({
+        userId,
+      }).session(session);
+
+      if (
+        !carrinho ||
+        !Array.isArray(carrinho.itens) ||
+        carrinho.itens.length === 0
+      ) {
+        throw new Error("Carrinho vazio ou inexistente.");
+      }
+
+      // 5. Obter o endereço de entrega.
+      const enderecoEntrega =
+        await obterEnderecoParaCheckout({
+          userId,
+          enderecoId,
+          session,
+        });
+
+      const itensPedido = [];
+      let subtotalCentavos = 0;
+
+      // 6. Validar produtos e reservar estoque.
+      // Operações sequenciais dentro da sessão.
+      for (const item of carrinho.itens) {
+        if (
+          !Number.isSafeInteger(item.quantidade) ||
+          item.quantidade <= 0
+        ) {
+          throw new Error("Quantidade inválida.");
+        }
+
+        const produto = await Product.findOne({
+          _id: item.productId,
+          ativo: true,
+        }).session(session);
+
+        if (!produto) {
+          throw new Error(
+            "Produto indisponível no carrinho."
+          );
+        }
+
+        const variacao = produto.variacoes.id(
+          item.variantId
+        );
+
+        if (!variacao || !variacao.ativo) {
+          throw new Error(
+            "Variação indisponível no carrinho."
+          );
+        }
+
+        const preco = variacao.precoCentavos;
+        const quantidade = item.quantidade;
+
+        if (
+          !Number.isSafeInteger(preco) ||
+          preco < 0
+        ) {
+          throw new Error("Preço inválido.");
+        }
+
+        const subtotalItem = preco * quantidade;
+
+        if (!Number.isSafeInteger(subtotalItem)) {
+          throw new Error(
+            "Subtotal do item excede o limite permitido."
+          );
+        }
+
+        subtotalCentavos += subtotalItem;
+
+        if (!Number.isSafeInteger(subtotalCentavos)) {
+          throw new Error(
+            "Subtotal do pedido excede o limite permitido."
+          );
+        }
+
+        // Reserva atômica de estoque.
+        await reservarEstoque({
+          productId: produto._id,
+          variantId: variacao._id,
+          quantidade,
+          session,
+        });
+
+        const atributos = variacao.atributos
+          ? Object.fromEntries(variacao.atributos)
+          : {};
+
+        // Snapshot do produto no momento do checkout.
+        itensPedido.push({
+          productId: produto._id,
+          variantId: variacao._id,
+          nomeProduto: produto.nome,
+          sku: variacao.sku,
+          atributos,
+          quantidade,
+          precoUnitarioCentavos: preco,
+          subtotalCentavos: subtotalItem,
+        });
+      }
+
+      // 7. Preparar o pedido.
+      const orderId = new mongoose.Types.ObjectId();
+
+      let descontoCentavos = 0;
+      let couponId = null;
+      let codigoCupom = null;
+
+      // 8. Reservar cupom, se existir.
+      if (carrinho.couponId) {
+        const reservaCupom = await reservarCupom({
+          couponId: carrinho.couponId,
+          userId,
+          orderId,
+          subtotalCentavos,
+          session,
+        });
+
+        descontoCentavos = calcularDesconto({
+          subtotalCentavos,
+          tipo: reservaCupom.tipo,
+          valor: reservaCupom.valor,
+        });
+
+        couponId = reservaCupom.couponId;
+        codigoCupom = reservaCupom.codigo;
+      }
+
+      // 9. Calcular o total.
+      // Frete provisório: somente no ambiente de testes.
+      const freteCentavos = 0;
+
+      const totalCentavos =
+        subtotalCentavos -
+        descontoCentavos +
+        freteCentavos;
+
+      if (
+        !Number.isSafeInteger(totalCentavos) ||
+        totalCentavos < 0
+      ) {
+        throw new Error("Total do pedido inválido.");
+      }
+
+      // 10. Definir o prazo da reserva.
+      // Margem de segurança para o limite de
+      // 15 minutos validado pelo modelo Order.
+      const expiresAt = new Date(
+        Date.now() + 14 * 60 * 1000
+      );
+
+      // 11. Criar o pedido na mesma transação.
+      const [pedido] = await Order.create(
+        [
+          {
+            _id: orderId,
+            userId,
+
+            checkoutIdempotencyKey: chave,
+
+            // Identificador original do endereço.
+            enderecoOrigemId: enderecoId,
+
+            itens: itensPedido,
+            enderecoEntrega,
+
+            subtotalCentavos,
+            descontoCentavos,
+            freteCentavos,
+            totalCentavos,
+
+            couponId,
+            codigoCupom,
+
+            status: "aguardando_pagamento",
+
+            reserva: {
+              status: "reservado",
+              expiresAt,
+            },
+          },
+        ],
+        { session }
+      );
+
+      return pedido;
+    });
+  } catch (erro) {
+    // CAMINHO 3:
+    // Se outra requisição criou o mesmo pedido,
+    // tentar recuperá-lo após erro de índice único.
+    if (erro?.code === 11000) {
+      const existente = await Order.findOne(
+        filtroIdempotencia
+      );
+
+      if (existente) {
+        validarIdempotenciaEndereco(
+          existente,
+          enderecoId
+        );
+
+        return existente;
+      }
+    }
+
+    throw erro;
+  }
+}
 
 module.exports = {
   executarTransacao,
@@ -445,5 +764,5 @@ module.exports = {
   reservarCupom,
   consumirCupom,
   liberarCupom,
+  criarPedidoCheckout,
 };
-

@@ -1,26 +1,42 @@
+
 const mongoose = require("mongoose");
 
-const orderItemSchema = new mongoose.Schema(
+const { Schema } = mongoose;
+
+const inteiroNaoNegativo = (valor) =>
+  Number.isSafeInteger(valor) && valor >= 0;
+
+const inteiroPositivo = (valor) =>
+  Number.isSafeInteger(valor) && valor > 0;
+
+const validarCentavos = {
+  validator: inteiroNaoNegativo,
+  message: "O valor deve ser um inteiro não negativo.",
+};
+
+const orderItemSchema = new Schema(
   {
     productId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "Product",
       required: true,
     },
 
     variantId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       required: true,
     },
 
     nomeProduto: {
       type: String,
       required: true,
+      trim: true,
     },
 
     sku: {
       type: String,
       required: true,
+      trim: true,
     },
 
     atributos: {
@@ -32,9 +48,8 @@ const orderItemSchema = new mongoose.Schema(
     quantidade: {
       type: Number,
       required: true,
-      min: 1,
       validate: {
-        validator: Number.isSafeInteger,
+        validator: inteiroPositivo,
         message: "Quantidade inválida.",
       },
     },
@@ -42,47 +57,78 @@ const orderItemSchema = new mongoose.Schema(
     precoUnitarioCentavos: {
       type: Number,
       required: true,
-      min: 0,
-      validate: {
-        validator: Number.isSafeInteger,
-        message: "Preço unitário inválido.",
-      },
+      validate: validarCentavos,
     },
 
     subtotalCentavos: {
       type: Number,
       required: true,
-      min: 0,
-      validate: {
-        validator: Number.isSafeInteger,
-        message: "Subtotal inválido.",
-      },
+      validate: validarCentavos,
     },
   },
-  {
-    _id: false,
-  }
+  { _id: false }
 );
 
-const enderecoEntregaSchema = new mongoose.Schema(
+orderItemSchema.pre("validate", function () {
+  if (
+    !inteiroPositivo(this.quantidade) ||
+    !inteiroNaoNegativo(this.precoUnitarioCentavos)
+  ) {
+    return;
+  }
+
+  const subtotal =
+    this.quantidade * this.precoUnitarioCentavos;
+
+  if (
+    !Number.isSafeInteger(subtotal) ||
+    this.subtotalCentavos !== subtotal
+  ) {
+    this.invalidate(
+      "subtotalCentavos",
+      "Subtotal do item inconsistente."
+    );
+  }
+});
+
+const enderecoEntregaSchema = new Schema(
   {
-    cep: { type: String, required: true },
-    logradouro: { type: String, required: true },
-    numero: { type: String, required: true },
-    complemento: { type: String, default: "" },
-    bairro: { type: String, required: true },
-    cidade: { type: String, required: true },
-    estado: { type: String, required: true },
+    cep: { type: String, required: true, trim: true },
+    logradouro: { type: String, required: true, trim: true },
+    numero: { type: String, required: true, trim: true },
+    complemento: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    bairro: { type: String, required: true, trim: true },
+    cidade: { type: String, required: true, trim: true },
+    estado: { type: String, required: true, trim: true },
   },
-  {
-    _id: false,
-  }
+  { _id: false }
 );
 
-const orderSchema = new mongoose.Schema(
+const reservaSchema = new Schema(
+  {
+    status: {
+      type: String,
+      enum: ["reservado", "consumido", "liberado"],
+      required: true,
+      default: "reservado",
+    },
+
+    expiresAt: {
+      type: Date,
+      required: true,
+    },
+  },
+  { _id: false }
+);
+
+const orderSchema = new Schema(
   {
     userId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
       immutable: true,
@@ -92,7 +138,18 @@ const orderSchema = new mongoose.Schema(
       type: String,
       required: true,
       immutable: true,
+      trim: true,
+      minlength: 8,
+      maxlength: 128,
     },
+
+
+enderecoOrigemId: {
+  type: Schema.Types.ObjectId,
+  required: false,
+  immutable: true,
+},
+
 
     itens: {
       type: [orderItemSchema],
@@ -112,29 +169,29 @@ const orderSchema = new mongoose.Schema(
     subtotalCentavos: {
       type: Number,
       required: true,
-      min: 0,
+      validate: validarCentavos,
     },
 
     descontoCentavos: {
       type: Number,
       default: 0,
-      min: 0,
+      validate: validarCentavos,
     },
 
     freteCentavos: {
       type: Number,
       default: 0,
-      min: 0,
+      validate: validarCentavos,
     },
 
     totalCentavos: {
       type: Number,
       required: true,
-      min: 0,
+      validate: validarCentavos,
     },
 
     couponId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "Coupon",
       default: null,
     },
@@ -142,6 +199,8 @@ const orderSchema = new mongoose.Schema(
     codigoCupom: {
       type: String,
       default: null,
+      trim: true,
+      uppercase: true,
     },
 
     status: {
@@ -154,20 +213,13 @@ const orderSchema = new mongoose.Schema(
         "entregue",
         "cancelado",
       ],
+      required: true,
       default: "aguardando_pagamento",
     },
 
     reserva: {
-      status: {
-        type: String,
-        enum: ["reservado", "consumido", "liberado"],
-        required: true,
-        default: "reservado",
-      },
-      expiresAt: {
-        type: Date,
-        required: true,
-      },
+      type: reservaSchema,
+      required: true,
     },
 
     pagoEm: {
@@ -187,49 +239,42 @@ const orderSchema = new mongoose.Schema(
   }
 );
 
-const inteiroNaoNegativo = (valor) =>
-  Number.isSafeInteger(valor) && valor >= 0;
-
-for (const campo of [
-  "subtotalCentavos",
-  "descontoCentavos",
-  "freteCentavos",
-  "totalCentavos",
-]) {
-  orderSchema.path(campo).validate(
-    inteiroNaoNegativo,
-    `${campo} deve ser um inteiro não negativo.`
-  );
-}
-
 orderSchema.pre("validate", function () {
-  const valoresValidos = [
+  const valores = [
     this.subtotalCentavos,
     this.descontoCentavos,
     this.freteCentavos,
     this.totalCentavos,
-  ].every(inteiroNaoNegativo);
+  ];
 
-  if (!valoresValidos) return;
+  if (!valores.every(inteiroNaoNegativo)) {
+    return;
+  }
 
   if (this.descontoCentavos > this.subtotalCentavos) {
     this.invalidate(
       "descontoCentavos",
       "Desconto superior ao subtotal."
     );
-    return;
   }
 
-  const subtotalItens = this.itens.reduce(
-    (total, item) => total + item.quantidade * item.precoUnitarioCentavos,
-    0
-  );
-  if (!Number.isSafeInteger(subtotalItens) || subtotalItens !== this.subtotalCentavos) {
-    this.invalidate("subtotalCentavos", "Subtotal diferente da soma dos itens.");
-  }
+  if (Array.isArray(this.itens)) {
+    const subtotalItens = this.itens.reduce(
+      (total, item) =>
+        total +
+        item.quantidade * item.precoUnitarioCentavos,
+      0
+    );
 
-  if (this.reserva?.status === "reservado" && this.reserva.expiresAt <= this.createdAt && this.createdAt) {
-    this.invalidate("reserva.expiresAt", "Expiração deve ser posterior à criação do pedido.");
+    if (
+      !Number.isSafeInteger(subtotalItens) ||
+      subtotalItens !== this.subtotalCentavos
+    ) {
+      this.invalidate(
+        "subtotalCentavos",
+        "Subtotal diferente da soma dos itens."
+      );
+    }
   }
 
   const totalEsperado =
@@ -243,30 +288,106 @@ orderSchema.pre("validate", function () {
   ) {
     this.invalidate(
       "totalCentavos",
-      "O total do pedido está inconsistente."
+      "Total do pedido inconsistente."
     );
+  }
+
+  if (Boolean(this.couponId) !== Boolean(this.codigoCupom)) {
+    this.invalidate(
+      "codigoCupom",
+      "Identificação do cupom incompleta."
+    );
+  }
+
+  if (this.reserva?.expiresAt) {
+    const expiraEm = this.reserva.expiresAt.getTime();
+
+    if (!Number.isFinite(expiraEm)) {
+      this.invalidate(
+        "reserva.expiresAt",
+        "Data de expiração inválida."
+      );
+    }
+
+    // Para pedidos novos, a reserva não pode
+    // ultrapassar 15 minutos a partir da criação.
+    if (this.isNew && Number.isFinite(expiraEm)) {
+      const referencia = this.createdAt
+        ? this.createdAt.getTime()
+        : Date.now();
+
+      const diferenca = expiraEm - referencia;
+
+      if (diferenca <= 0 || diferenca > 900000) {
+        this.invalidate(
+          "reserva.expiresAt",
+          "A reserva deve expirar em até 15 minutos."
+        );
+      }
+    }
+  }
+
+  if (
+    this.status === "aguardando_pagamento" &&
+    this.reserva?.status !== "reservado"
+  ) {
+    this.invalidate(
+      "reserva.status",
+      "Pedido aguardando pagamento exige reserva ativa."
+    );
+  }
+
+  if (
+    ["pago", "em_preparacao", "enviado", "entregue"]
+      .includes(this.status)
+  ) {
+    if (this.reserva?.status !== "consumido") {
+      this.invalidate(
+        "reserva.status",
+        "Pedido pago exige reserva consumida."
+      );
+    }
+
+    if (!this.pagoEm) {
+      this.invalidate(
+        "pagoEm",
+        "Pedido pago exige data de pagamento."
+      );
+    }
+  }
+
+  if (this.status === "cancelado") {
+    if (!this.canceladoEm) {
+      this.invalidate(
+        "canceladoEm",
+        "Pedido cancelado exige data de cancelamento."
+      );
+    }
+
+    if (this.reserva?.status !== "liberado") {
+      this.invalidate(
+        "reserva.status",
+        "Pedido cancelado exige reserva liberada."
+      );
+    }
   }
 });
 
-// Impede duplicar o checkout de um usuário.
 orderSchema.index(
   { userId: 1, checkoutIdempotencyKey: 1 },
   { unique: true }
 );
 
-// Histórico de pedidos.
 orderSchema.index({
   userId: 1,
   createdAt: -1,
 });
 
-// Localização de reservas vencidas.
 orderSchema.index({
   "reserva.status": 1,
   "reserva.expiresAt": 1,
 });
 
-module.exports = mongoose.model(
-  "Order",
-  orderSchema
-);
+module.exports =
+  mongoose.models.Order ||
+  mongoose.model("Order", orderSchema);

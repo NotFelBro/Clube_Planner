@@ -33,15 +33,23 @@ const enderecoBase = {
   estado: "SP",
 };
 
+const usuariosCriados = [];
+
+
 async function criarUsuario() {
-  return User.create({
+  const usuario = await User.create({
     nome: "Cliente Teste",
-    email: "cliente@example.com",
+    email: `cliente-${new mongoose.Types.ObjectId()}@example.com`,
     cpf: "52998224725",
     telefone: "11999999999",
     senhaHash: "hash-ficticio-para-teste",
   });
+
+  usuariosCriados.push(usuario._id);
+
+  return usuario;
 }
+
 
 function obterUriDeTeste() {
   const uri = process.env.MONGODB_TEST_URI;
@@ -82,14 +90,21 @@ beforeAll(async () => {
   await User.init();
 }, 30000);
 
+
 afterEach(async () => {
   if (
     mongoose.connection.readyState === 1 &&
-    mongoose.connection.name === "clube_planner_test"
+    mongoose.connection.name === "clube_planner_test" &&
+    usuariosCriados.length > 0
   ) {
-    await User.deleteMany({});
+    await User.deleteMany({
+      _id: { $in: usuariosCriados },
+    });
+
+    usuariosCriados.length = 0;
   }
 });
+
 
 afterAll(async () => {
   await mongoose.disconnect();
