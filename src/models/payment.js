@@ -1,111 +1,145 @@
 
 const mongoose = require("mongoose");
-
 const { Schema } = mongoose;
 
-const paymentSchema = new Schema(
-  {
-    orderId: {
-      type: Schema.Types.ObjectId,
-      ref: "Order",
-      required: true,
-      immutable: true,
-    },
+const validarCentavos = {
+  validator: v => Number.isSafeInteger(v) && v >= 0,
+  message: "Valor monetário inválido."
+};
 
-    userId: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-      immutable: true,
-    },
-
-    provider: {
-      type: String,
-      enum: ["mercado_pago"],
-      default: "mercado_pago",
-      required: true,
-      immutable: true,
-    },
-
-    providerPaymentId: {
-      type: String,
-      default: null,
-      trim: true,
-    },
-
-    idempotencyKey: {
-      type: String,
-      required: true,
-      immutable: true,
-      trim: true,
-      minlength: 8,
-      maxlength: 128,
-    },
-
-    metodo: {
-      type: String,
-      enum: ["pix", "cartao", "boleto"],
-      required: true,
-      immutable: true,
-    },
-
-    valorCentavos: {
-      type: Number,
-      required: true,
-      immutable: true,
-      validate: {
-        validator: (valor) =>
-          Number.isSafeInteger(valor) && valor > 0,
-        message:
-          "Valor de pagamento deve ser um inteiro positivo.",
-      },
-    },
-
-    status: {
-      type: String,
-      enum: [
-        "criado",
-        "pendente",
-        "em_processamento",
-        "aprovado",
-        "recusado",
-        "cancelado",
-        "reembolsado",
-      ],
-      required: true,
-      default: "criado",
-    },
-
-    providerStatus: {
-      type: String,
-      default: null,
-      trim: true,
-    },
-
-    aprovadoEm: {
-      type: Date,
-      default: null,
-    },
-
-    ultimaConsultaEm: {
-      type: Date,
-      default: null,
-    },
-
-    expiraEm: {
-      type: Date,
-      default: null,
-    },
+const paymentSchema = new Schema({
+  orderId: {
+    type: Schema.Types.ObjectId,
+    ref: "Order",
+    required: true,
+    immutable: true
   },
-  {
-    collection: "payments",
-    timestamps: true,
-    versionKey: false,
-  }
-);
 
-// Validações de consistência documental.
+  userId: {
+    type: Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+    immutable: true
+  },
+
+  provider: {
+    type: String,
+    enum: ["mercado_pago"],
+    default: "mercado_pago",
+    required: true,
+    immutable: true
+  },
+
+  providerPaymentId: {
+    type: String,
+    default: null,
+    trim: true
+  },
+
+  idempotencyKey: {
+    type: String,
+    required: true,
+    immutable: true,
+    trim: true,
+    minlength: 8,
+    maxlength: 128
+  },
+
+  metodo: {
+    type: String,
+    enum: ["pix", "cartao", "boleto"],
+    required: true,
+    immutable: true
+  },
+
+  valorCentavos: {
+    type: Number,
+    required: true,
+    immutable: true,
+    validate: {
+      validator: v =>
+        Number.isSafeInteger(v) && v > 0,
+      message: "Valor de pagamento inválido."
+    }
+  },
+
+  capturedCentavos: {
+    type: Number,
+    default: 0,
+    validate: validarCentavos
+  },
+
+  refundReservedCentavos: {
+    type: Number,
+    default: 0,
+    validate: validarCentavos
+  },
+
+  refundSucceededCentavos: {
+    type: Number,
+    default: 0,
+    validate: validarCentavos
+  },
+
+  refundUpdatedAt: {
+    type: Date,
+    default: null
+  },
+
+  status: {
+    type: String,
+    enum: [
+      "criado",
+      "pendente",
+      "em_processamento",
+      "aprovado",
+      "recusado",
+      "cancelado",
+      "reembolsado"
+    ],
+    required: true,
+    default: "criado"
+  },
+
+  providerStatus: {
+    type: String,
+    default: null,
+    trim: true
+  },
+
+  aprovadoEm: {
+    type: Date,
+    default: null
+  },
+
+  ultimaConsultaEm: {
+    type: Date,
+    default: null
+  },
+
+  expiraEm: {
+    type: Date,
+    default: null
+  }
+}, {
+  collection: "payments",
+  timestamps: true,
+  versionKey: false
+});
+
 paymentSchema.pre("validate", function () {
+  if (
+    this.capturedCentavos > this.valorCentavos ||
+    this.refundReservedCentavos +
+      this.refundSucceededCentavos >
+      this.capturedCentavos
+  ) {
+    this.invalidate(
+      "capturedCentavos",
+      "Saldo de reembolso excede o valor capturado."
+    );
+  }
+
   if (this.status === "aprovado" && !this.aprovadoEm) {
     this.invalidate(
       "aprovadoEm",
@@ -135,33 +169,29 @@ paymentSchema.pre("validate", function () {
   }
 });
 
-// Uma chave de idempotência por provedor.
 paymentSchema.index(
   { provider: 1, idempotencyKey: 1 },
   { unique: true }
 );
 
-// IDs do provedor são únicos quando existentes.
 paymentSchema.index(
   { provider: 1, providerPaymentId: 1 },
   {
     unique: true,
     partialFilterExpression: {
-      providerPaymentId: { $type: "string" },
-    },
+      providerPaymentId: { $type: "string" }
+    }
   }
 );
 
-// Histórico de tentativas por pedido.
 paymentSchema.index({
   orderId: 1,
-  createdAt: -1,
+  createdAt: -1
 });
 
-// Consultas de pagamentos pendentes.
 paymentSchema.index({
   status: 1,
-  updatedAt: 1,
+  updatedAt: 1
 });
 
 module.exports =
