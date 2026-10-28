@@ -20,17 +20,24 @@ function criarPedido(alteracoes = {}) {
       new mongoose.Types.ObjectId().toHexString(),
 
     itens: [
-      {
-        productId: new mongoose.Types.ObjectId(),
-        variantId: new mongoose.Types.ObjectId(),
-        nomeProduto: "Planner Semanal",
-        sku: "PLANNER-001",
-        atributos: { cor: "Azul" },
-        quantidade: 2,
-        precoUnitarioCentavos: 2500,
-        subtotalCentavos: 5000,
-      },
-    ],
+  {
+    lineId: "line_1",
+
+    productId: new mongoose.Types.ObjectId(),
+    variantId: new mongoose.Types.ObjectId(),
+
+    nomeProduto: "Planner Semanal",
+    sku: "PLANNER-001",
+    atributos: { cor: "Azul" },
+
+    quantidade: 2,
+    precoUnitarioCentavos: 2500,
+    subtotalCentavos: 5000,
+
+    descontoAlocadoCentavos: 500,
+    totalLiquidoCentavos: 4500,
+  },
+],
 
     enderecoEntrega: {
       cep: "13000000",

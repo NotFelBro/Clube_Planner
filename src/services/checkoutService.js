@@ -16,6 +16,10 @@ const {
 } = require("./discountService");
 
 const {
+  alocarDesconto,
+} = require("./allocationService");
+
+const {
   calcularCheckoutFingerprint,
 } = require("./checkoutFingerprint");
 
@@ -706,6 +710,7 @@ async function criarPedidoCheckout({
 
         // Snapshot do produto no momento do checkout.
         itensPedido.push({
+          lineId: `line_${itensPedido.length + 1}`,
           productId: produto._id,
           variantId: variacao._id,
           nomeProduto: produto.nome,
@@ -744,6 +749,12 @@ async function criarPedidoCheckout({
         codigoCupom = reservaCupom.codigo;
       }
 
+      // Ratear o desconto entre os itens do pedido.
+      const itensComRateio = alocarDesconto(
+        itensPedido,
+        descontoCentavos
+      );
+
       // 12. Calcular o total.
       // Frete provisório: somente no ambiente de testes.
       const freteCentavos = 0;
@@ -780,7 +791,7 @@ async function criarPedidoCheckout({
 
             enderecoOrigemId: enderecoId,
 
-            itens: itensPedido,
+            itens: itensComRateio,
             enderecoEntrega,
 
             subtotalCentavos,
