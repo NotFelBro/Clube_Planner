@@ -175,22 +175,17 @@ userSchema.path("enderecos").validate(
 );
 
 
-// CPF único entre usuários ativos.
+
+// CPF único entre todos os usuários.
 userSchema.index(
   { cpf: 1 },
-  {
-    unique: true,
-    partialFilterExpression: { ativo: true },
-  }
+  { unique: true }
 );
 
-// E-mail único entre usuários ativos.
+// E-mail único entre todos os usuários.
 userSchema.index(
   { email: 1 },
-  {
-    unique: true,
-    partialFilterExpression: { ativo: true },
-  }
+  { unique: true }
 );
 
 
