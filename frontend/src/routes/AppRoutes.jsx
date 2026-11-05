@@ -1,21 +1,67 @@
 
-import { Navigate, Route, Routes } from "react-router";
+import {
+  Navigate,
+  Route,
+  Routes,
+  useSearchParams,
+} from "react-router";
 
+// Layout da loja
 import StoreLayout from "../components/layout/StoreLayout.jsx";
 
+// Layout e proteção administrativa
+import AdminLayout from "../components/admin/AdminLayout.jsx";
+import AdminAccess from "../components/admin/AdminAccess.jsx";
+
+// Páginas da loja
 import Home from "../pages/store/Home.jsx";
 import ProductDetail from "../pages/store/ProductDetail.jsx";
+import ProductFeedbacks from "../pages/store/ProductFeedbacks.jsx";
+import ShoppingCart from "../pages/store/ShoppingCart.jsx";
+import Checkout from "../pages/store/Checkout.jsx";
+import OrderDetails from "../pages/store/OrderDetails.jsx";
+import Colecoes from "../pages/store/Colecoes.jsx";
 import ComingSoon from "../pages/store/ComingSoon.jsx";
 
+// Autenticação
 import Login from "../pages/auth/Login.jsx";
 import Cadastro from "../pages/auth/Cadastro.jsx";
 
-import MyProfile from "../pages/account/MyProfile.jsx";
+// Perfil do cliente
+import MyProfile, {
+  FavoritesPage,
+} from "../pages/account/MyProfile.jsx";
+
+// Páginas administrativas
+import AdminSection from "../pages/admin/AdminSection.jsx";
+
+// Redirecionamento específico de Papelaria Criativa
+function CollectionsRoute() {
+  const [params] = useSearchParams();
+
+  if (params.get("categoria") === "papelaria") {
+    return (
+      <Navigate
+        to="/loja?categoria=papelaria"
+        replace
+      />
+    );
+  }
+
+  return <Colecoes />;
+}
 
 export default function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<Login />} />
+      {/* =====================================
+          AUTENTICAÇÃO
+      ===================================== */}
+
+      <Route
+        path="/"
+        element={<Login />}
+      />
 
       <Route
         path="/login"
@@ -27,16 +73,167 @@ export default function AppRoutes() {
         element={<Cadastro />}
       />
 
+      {/* =====================================
+          PAINEL ADMINISTRATIVO - DEMONSTRAÇÃO
+      ===================================== */}
+
+      <Route
+        path="/admin-demo"
+        element={<AdminLayout preview />}
+      >
+        <Route
+          index
+          element={
+            <AdminSection section="dashboard" />
+          }
+        />
+
+        <Route
+          path="produtos"
+          element={
+            <AdminSection section="produtos" />
+          }
+        />
+
+        <Route
+          path="categorias"
+          element={
+            <AdminSection section="categorias" />
+          }
+        />
+
+        <Route
+          path="pedidos"
+          element={
+            <AdminSection section="pedidos" />
+          }
+        />
+
+        <Route
+          path="vendas"
+          element={
+            <AdminSection section="vendas" />
+          }
+        />
+
+        <Route
+          path="clientes"
+          element={
+            <AdminSection section="clientes" />
+          }
+        />
+
+        <Route
+          path="relatorios"
+          element={
+            <AdminSection section="relatorios" />
+          }
+        />
+
+        <Route
+          path="configuracoes"
+          element={
+            <AdminSection section="configuracoes" />
+          }
+        />
+      </Route>
+
+      {/* =====================================
+          ADMINISTRATIVO - ACESSO PROTEGIDO
+      ===================================== */}
+
+      <Route
+        path="/admin"
+        element={<AdminAccess />}
+      />
+
+      <Route
+        path="/admin/*"
+        element={<AdminAccess />}
+      />
+
+      {/* =====================================
+          LOJA E PERFIL
+      ===================================== */}
+
       <Route element={<StoreLayout />}>
+        {/* Página principal */}
+
         <Route
           path="/loja"
           element={<Home />}
         />
 
+        {/* Produtos */}
+
         <Route
           path="/produto/:id"
           element={<ProductDetail />}
         />
+
+        <Route
+          path="/produto/:id/feedbacks"
+          element={<ProductFeedbacks />}
+        />
+
+        {/* Sacola e checkout */}
+
+        <Route
+          path="/sacola"
+          element={<ShoppingCart />}
+        />
+
+        <Route
+          path="/checkout"
+          element={<Checkout />}
+        />
+
+        {/* Detalhes de pedidos */}
+
+        <Route
+          path="/perfil/pedidos/:id"
+          element={<OrderDetails />}
+        />
+
+        {/* Coleções */}
+
+        <Route
+          path="/colecoes"
+          element={<CollectionsRoute />}
+        />
+
+        {/* Papelaria Criativa */}
+
+        <Route
+          path="/papelaria-criativa"
+          element={
+            <Navigate
+              to="/loja?categoria=papelaria"
+              replace
+            />
+          }
+        />
+
+        {/* Organização */}
+
+        <Route
+          path="/organizacao"
+          element={
+            <Navigate
+              to="/colecoes?categoria=organizacao"
+              replace
+            />
+          }
+        />
+
+        {/* Novidades */}
+
+        <Route
+          path="/novidades"
+          element={<ComingSoon />}
+        />
+
+        {/* Minha conta */}
 
         <Route
           path="/perfil"
@@ -45,58 +242,66 @@ export default function AppRoutes() {
 
         <Route
           path="/perfil/pedidos"
-          element={<ComingSoon />}
+          element={<MyProfile />}
+        />
+
+        <Route
+          path="/perfil/andamento"
+          element={<MyProfile />}
         />
 
         <Route
           path="/perfil/enderecos"
-          element={<ComingSoon />}
+          element={<MyProfile />}
         />
 
         <Route
           path="/perfil/dados"
-          element={<ComingSoon />}
+          element={<MyProfile />}
         />
 
         <Route
           path="/perfil/cargo"
-          element={<ComingSoon />}
+          element={<MyProfile />}
         />
 
         <Route
           path="/perfil/seguranca"
-          element={<ComingSoon />}
+          element={<MyProfile />}
         />
+
+        {/* Acesso ao painel administrativo */}
 
         <Route
           path="/perfil/administrativo"
-          element={<ComingSoon />}
+          element={
+            <Navigate
+              to="/admin"
+              replace
+            />
+          }
         />
 
-        <Route
-          path="/colecoes"
-          element={<ComingSoon />}
-        />
-
-        <Route
-          path="/novidades"
-          element={<ComingSoon />}
-        />
+        {/* Favoritos */}
 
         <Route
           path="/favoritos"
-          element={<ComingSoon />}
-        />
-
-        <Route
-          path="/sacola"
-          element={<ComingSoon />}
+          element={<FavoritesPage />}
         />
       </Route>
 
+      {/* =====================================
+          ROTA NÃO ENCONTRADA
+      ===================================== */}
+
       <Route
         path="*"
-        element={<Navigate to="/" replace />}
+        element={
+          <Navigate
+            to="/loja"
+            replace
+          />
+        }
       />
     </Routes>
   );

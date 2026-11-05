@@ -1,16 +1,17 @@
 
 import { useRef, useState } from "react";
-import { Link } from "react-router";
+import {
+  Link,
+  useSearchParams,
+} from "react-router";
 
 import HeroCarousel from "../../components/store/HeroCarousel.jsx";
 import { useStore } from "../../components/layout/StoreLayout.jsx";
-
 import {
   products,
   formatPrice,
 } from "../../data/products.js";
 
-// Categorias da loja
 const categories = [
   {
     id: "planners",
@@ -42,7 +43,6 @@ const categories = [
   },
 ];
 
-// Ilustração demonstrativa dos produtos
 function PlannerIllustration({ compact = false }) {
   return (
     <div
@@ -64,7 +64,6 @@ function PlannerIllustration({ compact = false }) {
   );
 }
 
-// Card de categoria
 function CategoryCard({
   category,
   isActive,
@@ -75,7 +74,7 @@ function CategoryCard({
       type="button"
       onClick={() => onSelect(category.id)}
       aria-pressed={isActive}
-      className={`flex min-h-[130px] w-full items-center gap-4 rounded-2xl border bg-white p-4 text-left transition hover:-translate-y-1 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-terracotta ${
+      className={`flex min-h-[130px] w-full items-center gap-4 rounded-2xl border bg-white p-4 text-left transition hover:-translate-y-1 hover:shadow-md ${
         isActive
           ? "border-terracotta shadow-sm"
           : "border-line"
@@ -107,7 +106,6 @@ function CategoryCard({
   );
 }
 
-// Card individual de produto
 function ProductCard({ product, onAdd }) {
   const {
     favorites,
@@ -120,32 +118,36 @@ function ProductCard({ product, onAdd }) {
 
   return (
     <article className="flex flex-col rounded-2xl border border-line bg-white p-3 transition hover:shadow-md">
-      {/* Imagem demonstrativa */}
       <div
         className="relative flex h-[165px] items-center justify-center rounded-xl"
         style={{
-          backgroundColor: product.background,
+          backgroundColor:
+            product.background || "#E8F1E8",
         }}
       >
         <PlannerIllustration compact />
 
-        {/* Favoritos */}
         <button
           type="button"
-          onClick={() => toggleFavorite(product)}
+          onClick={() =>
+            toggleFavorite(product)
+          }
           aria-label={
             isFavorite
               ? `Remover ${product.name} dos favoritos`
               : `Adicionar ${product.name} aos favoritos`
           }
           aria-pressed={isFavorite}
-          className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full bg-white text-xl text-terracotta shadow-sm transition hover:scale-110"
+          className={`absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full bg-white text-xl shadow-sm transition hover:scale-110 ${
+            isFavorite
+              ? "text-red-600"
+              : "text-terracotta"
+          }`}
         >
           {isFavorite ? "♥" : "♡"}
         </button>
       </div>
 
-      {/* Informações */}
       <div className="flex flex-1 flex-col px-1 pb-1 pt-4">
         <h3 className="text-[15px] font-semibold">
           {product.name}
@@ -155,7 +157,6 @@ function ProductCard({ product, onAdd }) {
           {product.description}
         </p>
 
-        {/* Preço e promoções */}
         <div className="mt-4 flex flex-wrap items-center gap-1.5">
           <span className="font-display text-[18px] font-semibold">
             {formatPrice(product.price)}
@@ -174,7 +175,6 @@ function ProductCard({ product, onAdd }) {
           )}
         </div>
 
-        {/* Ações do produto */}
         <div className="mt-auto flex gap-2 pt-4">
           <Link
             to={`/produto/${product.id}`}
@@ -198,7 +198,6 @@ function ProductCard({ product, onAdd }) {
   );
 }
 
-// Página inicial da loja
 export default function Home() {
   const {
     search,
@@ -207,15 +206,25 @@ export default function Home() {
 
   const productsRef = useRef(null);
 
-  const [activeCategory, setActiveCategory] =
-    useState(null);
+  const [searchParams, setSearchParams] =
+    useSearchParams();
 
   const [feedback, setFeedback] =
     useState("");
 
-  // Categoria selecionada
+  const categoryFromUrl =
+    searchParams.get("categoria");
+
+  const activeCategory = categories.some(
+    (category) =>
+      category.id === categoryFromUrl
+  )
+    ? categoryFromUrl
+    : null;
+
   const selectedCategory = categories.find(
-    (category) => category.id === activeCategory
+    (category) =>
+      category.id === activeCategory
   );
 
   const sectionTitle = selectedCategory
@@ -226,7 +235,6 @@ export default function Home() {
     ? `Explore os produtos de ${selectedCategory.name.toLowerCase()}.`
     : "Peças especiais para acompanhar seus melhores planos.";
 
-  // Filtros de categoria e pesquisa
   const normalizedSearch = (search ?? "")
     .trim()
     .toLocaleLowerCase("pt-BR");
@@ -250,7 +258,6 @@ export default function Home() {
     }
   );
 
-  // Navegação até a seção de produtos
   function scrollToProducts() {
     if (!productsRef.current) return;
 
@@ -267,27 +274,28 @@ export default function Home() {
     });
   }
 
-  // Selecionar categoria
   function handleCategorySelect(categoryId) {
-    setActiveCategory(categoryId);
     setFeedback("");
+
+    setSearchParams({
+      categoria: categoryId,
+    });
 
     window.requestAnimationFrame(
       scrollToProducts
     );
   }
 
-  // Exibir todos os produtos
   function handleShowAll() {
-    setActiveCategory(null);
     setFeedback("");
+
+    setSearchParams({});
 
     window.requestAnimationFrame(
       scrollToProducts
     );
   }
 
-  // Adicionar produto à sacola
   function handleAdd(product) {
     addToCart(product);
 
@@ -372,7 +380,6 @@ export default function Home() {
           )}
         </div>
 
-        {/* Feedback da sacola */}
         {feedback && (
           <p
             role="status"
@@ -382,16 +389,17 @@ export default function Home() {
           </p>
         )}
 
-        {/* Lista de produtos */}
         {filteredProducts.length > 0 ? (
           <div className="mt-7 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-            {filteredProducts.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                onAdd={handleAdd}
-              />
-            ))}
+            {filteredProducts.map(
+              (product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  onAdd={handleAdd}
+                />
+              )
+            )}
           </div>
         ) : (
           <div className="mt-7 rounded-xl border border-line bg-white p-8 text-center">
@@ -400,8 +408,8 @@ export default function Home() {
             </p>
 
             <p className="mt-2 text-sm text-muted">
-              Tente pesquisar por outro nome
-              ou selecionar outra categoria.
+              Tente pesquisar por outro nome ou
+              selecionar outra categoria.
             </p>
 
             <button

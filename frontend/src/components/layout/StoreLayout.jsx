@@ -1,9 +1,6 @@
 
-
-
 import { createContext, useContext, useState } from "react";
-
-import { Link, NavLink, Outlet } from "react-router";
+import { Link, NavLink, Outlet, useNavigate } from "react-router";
 
 const StoreContext = createContext(null);
 
@@ -11,7 +8,9 @@ export function useStore() {
   const context = useContext(StoreContext);
 
   if (!context) {
-    throw new Error("useStore deve ser utilizado dentro de StoreLayout.");
+    throw new Error(
+      "useStore deve ser utilizado dentro de StoreLayout."
+    );
   }
 
   return context;
@@ -25,6 +24,18 @@ const categories = [
   { label: "Organização", category: "organizacao" },
   { label: "Novidades ✦", category: "novidades" },
 ];
+
+function categoryPath(category) {
+  if (category === "novidades") {
+    return "/novidades";
+  }
+
+  if (category === "papelaria") {
+    return "/loja?categoria=papelaria";
+  }
+
+  return `/colecoes?categoria=${category}`;
+}
 
 function HeartIcon() {
   return (
@@ -92,6 +103,7 @@ function SearchIcon() {
       stroke="currentColor"
       strokeWidth="1.7"
       strokeLinecap="round"
+      strokeLinejoin="round"
       aria-hidden="true"
     >
       <circle cx="10.8" cy="10.8" r="6.8" />
@@ -127,7 +139,8 @@ function Brand() {
 
       <div className="flex flex-col">
         <span className="font-display text-lg font-semibold leading-tight">
-          Clube<span className="text-terracotta">Planner</span>
+          Clube
+          <span className="text-terracotta">Planner</span>
         </span>
 
         <span className="text-[8px] uppercase tracking-[0.18em] text-muted">
@@ -138,8 +151,29 @@ function Brand() {
   );
 }
 
-function Header({ cartCount, favoritesCount, search, setSearch }) {
+function Header({
+  cartCount,
+  favoritesCount,
+  search,
+  setSearch,
+}) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const navigate = useNavigate();
+
+  function handleSearchSubmit(event) {
+    event.preventDefault();
+
+    navigate("/loja");
+
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById("produtos-destaque")
+        ?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+    });
+  }
 
   return (
     <>
@@ -154,15 +188,7 @@ function Header({ cartCount, favoritesCount, search, setSearch }) {
 
             <form
               role="search"
-              onSubmit={(event) => {
-                event.preventDefault();
-
-                document
-                  .getElementById("produtos-destaque")
-                  ?.scrollIntoView({
-                    behavior: "smooth",
-                  });
-              }}
+              onSubmit={handleSearchSubmit}
               className="order-3 flex w-full max-w-[500px] items-center rounded-xl border border-line bg-white px-4 lg:order-none"
             >
               <SearchIcon />
@@ -170,7 +196,9 @@ function Header({ cartCount, favoritesCount, search, setSearch }) {
               <input
                 type="search"
                 value={search}
-                onChange={(event) => setSearch(event.target.value)}
+                onChange={(event) =>
+                  setSearch(event.target.value)
+                }
                 placeholder="Busque planners, cadernos e papelaria criativa"
                 aria-label="Pesquisar produtos"
                 className="h-[46px] w-full min-w-0 bg-transparent px-3 text-sm text-slatebrand outline-none placeholder:text-muted"
@@ -218,9 +246,12 @@ function Header({ cartCount, favoritesCount, search, setSearch }) {
               className="flex w-full items-center justify-between py-3 text-sm font-semibold lg:hidden"
               aria-expanded={menuOpen}
               aria-controls="store-categories"
-              onClick={() => setMenuOpen((previous) => !previous)}
+              onClick={() =>
+                setMenuOpen((previous) => !previous)
+              }
             >
               Categorias da loja
+
               <span aria-hidden="true">
                 {menuOpen ? "−" : "+"}
               </span>
@@ -236,11 +267,7 @@ function Header({ cartCount, favoritesCount, search, setSearch }) {
               {categories.map(({ label, category }) => (
                 <Link
                   key={category}
-                  to={
-                    category === "novidades"
-                      ? "/novidades"
-                      : `/colecoes?categoria=${category}`
-                  }
+                  to={categoryPath(category)}
                   onClick={() => setMenuOpen(false)}
                   className={`rounded-lg px-3 py-2 text-[13px] font-medium transition hover:bg-softsage hover:text-terracotta lg:px-0 lg:py-0 lg:hover:bg-transparent ${
                     category === "novidades"
@@ -265,12 +292,15 @@ function Footer() {
       <div className="mx-auto grid max-w-[1320px] gap-9 px-5 py-10 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <h2 className="font-display text-lg font-semibold">
-            Clube<span className="text-terracotta">Planner</span>
+            Clube
+            <span className="text-terracotta">
+              Planner
+            </span>
           </h2>
 
           <p className="mt-5 max-w-[250px] text-[13px] leading-6">
-            Papelaria feita pra organizar a vida e transformar rotina em
-            leveza.
+            Papelaria feita pra organizar a vida e
+            transformar rotina em leveza.
           </p>
         </div>
 
@@ -312,10 +342,13 @@ function Footer() {
 
       <div className="mx-auto flex max-w-[1320px] flex-col gap-3 border-t border-white/20 px-5 py-5 text-[11px] sm:flex-row sm:justify-between">
         <p>
-          © {new Date().getFullYear()} Clube Planner. Todos os direitos
-          reservados.
+          © {new Date().getFullYear()} Clube Planner.
+          Todos os direitos reservados.
         </p>
-        <p>Compra segura • Privacidade protegida</p>
+
+        <p>
+          Compra segura • Privacidade protegida
+        </p>
       </div>
     </footer>
   );
@@ -333,18 +366,70 @@ export default function StoreLayout() {
   function toggleFavorite(product) {
     setFavorites((previous) =>
       previous.some((item) => item.id === product.id)
-        ? previous.filter((item) => item.id !== product.id)
+        ? previous.filter(
+            (item) => item.id !== product.id
+          )
         : [...previous, product]
     );
   }
 
+  function removeFromCart(productId) {
+    setCart((previous) =>
+      previous.filter(
+        (item) => item.id !== productId
+      )
+    );
+  }
+
+  function updateCartQuantity(productId, quantity) {
+    const nextQuantity = Math.max(
+      0,
+      Math.min(99, Math.trunc(Number(quantity) || 0))
+    );
+
+    setCart((previous) => {
+      const product = previous.find(
+        (item) => item.id === productId
+      );
+
+      if (!product) return previous;
+
+      const otherProducts = previous.filter(
+        (item) => item.id !== productId
+      );
+
+      return [
+        ...otherProducts,
+        ...Array.from(
+          { length: nextQuantity },
+          () => product
+        ),
+      ];
+    });
+  }
+
+  function clearCart() {
+    setCart([]);
+  }
+
+  const cartSubtotal = cart.reduce(
+    (total, product) =>
+      total + Number(product.price || 0),
+    0
+  );
+
   const store = {
     cart,
+    cartCount: cart.length,
+    cartSubtotal,
     favorites,
     search,
     setSearch,
     addToCart,
     toggleFavorite,
+    removeFromCart,
+    updateCartQuantity,
+    clearCart,
   };
 
   return (
@@ -357,7 +442,10 @@ export default function StoreLayout() {
           setSearch={setSearch}
         />
 
-        <main id="conteudo" className="w-full flex-1">
+        <main
+          id="conteudo"
+          className="w-full flex-1"
+        >
           <Outlet context={store} />
         </main>
 
