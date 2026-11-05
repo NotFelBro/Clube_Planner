@@ -10,6 +10,8 @@ import {
   afterEach,
 } from "vitest";
 
+import { gerarCpfTeste } from "./helpers/gerarCpfTeste.mjs";
+
 import mongoose from "mongoose";
 import { createRequire } from "node:module";
 
@@ -45,11 +47,12 @@ function obterUriTeste() {
   return uri;
 }
 
+
 async function criarUsuario() {
   const usuario = await User.create({
     nome: "Cliente Checkout Integração",
     email: `integracao-${new mongoose.Types.ObjectId()}@example.com`,
-    cpf: "52998224725",
+    cpf: gerarCpfTeste(),
     telefone: "11999999999",
     senhaHash: "hash-ficticio-para-teste",
     ativo: true,
@@ -73,6 +76,7 @@ async function criarUsuario() {
 
   return usuario;
 }
+
 
 async function criarProduto({
   estoque = 5,

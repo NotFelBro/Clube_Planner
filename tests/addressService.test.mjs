@@ -10,6 +10,7 @@ import {
 
 import mongoose from "mongoose";
 import dotenv from "dotenv";
+import { gerarCpfTeste } from "./helpers/gerarCpfTeste.mjs";
 
 import User from "../src/models/User.js";
 import addressService from "../src/services/addressService.js";
@@ -35,21 +36,18 @@ const enderecoBase = {
 
 const usuariosCriados = [];
 
-
 async function criarUsuario() {
   const usuario = await User.create({
     nome: "Cliente Teste",
     email: `cliente-${new mongoose.Types.ObjectId()}@example.com`,
-    cpf: "52998224725",
+    cpf: gerarCpfTeste(),
     telefone: "11999999999",
     senhaHash: "hash-ficticio-para-teste",
   });
 
   usuariosCriados.push(usuario._id);
-
   return usuario;
 }
-
 
 function obterUriDeTeste() {
   const uri = process.env.MONGODB_TEST_URI;
@@ -61,7 +59,6 @@ function obterUriDeTeste() {
   }
 
   const url = new URL(uri);
-
   const nomeBanco = decodeURIComponent(
     url.pathname.replace(/^\//, "")
   );
@@ -90,7 +87,6 @@ beforeAll(async () => {
   await User.init();
 }, 30000);
 
-
 afterEach(async () => {
   if (
     mongoose.connection.readyState === 1 &&
@@ -105,17 +101,11 @@ afterEach(async () => {
   }
 });
 
-
 afterAll(async () => {
   await mongoose.disconnect();
 });
 
-
-/**
- * Testes do serviço de endereços.
- */
 describe("Serviço de endereços", () => {
-
   it("define o primeiro endereço como principal", async () => {
     const usuario = await criarUsuario();
 
@@ -308,5 +298,4 @@ describe("Serviço de endereços", () => {
       )
     ).toHaveLength(1);
   });
-
 });

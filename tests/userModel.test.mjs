@@ -11,6 +11,7 @@ import {
 import "dotenv/config";
 import mongoose from "mongoose";
 import { createRequire } from "node:module";
+import { gerarCpfTeste } from "./helpers/gerarCpfTeste.mjs";
 
 const require = createRequire(import.meta.url);
 const User = require("../src/models/User.js");
@@ -80,7 +81,6 @@ describe("DM-USER-01 — Modelo User", () => {
   });
 });
 
-
 describe("DM-USER-01 — Unicidade no MongoDB", () => {
   let conexao;
   let UsuarioTeste;
@@ -90,7 +90,7 @@ describe("DM-USER-01 — Unicidade no MongoDB", () => {
     const usuario = await UsuarioTeste.create(
       criarDados({
         email: `teste-${new mongoose.Types.ObjectId()}@example.com`,
-        cpf: "52998224725",
+        cpf: gerarCpfTeste(),
         ...alteracoes,
       })
     );
@@ -150,6 +150,7 @@ describe("DM-USER-01 — Unicidade no MongoDB", () => {
       await UsuarioTeste.deleteMany({
         _id: { $in: idsCriados },
       });
+
       idsCriados.length = 0;
     }
   });
@@ -161,11 +162,11 @@ describe("DM-USER-01 — Unicidade no MongoDB", () => {
   });
 
   it("rejeita CPF duplicado entre usuários ativos", async () => {
-    await criarUsuario();
+    const usuario = await criarUsuario();
 
     await expect(
       criarUsuario({
-        cpf: "52998224725",
+        cpf: usuario.cpf,
       })
     ).rejects.toMatchObject({ code: 11000 });
   });
@@ -177,7 +178,6 @@ describe("DM-USER-01 — Unicidade no MongoDB", () => {
 
     await expect(
       criarUsuario({
-        cpf: "11144477735",
         email,
       })
     ).rejects.toMatchObject({ code: 11000 });
@@ -205,10 +205,8 @@ describe("DM-USER-01 — Unicidade no MongoDB", () => {
 
     await expect(
       criarUsuario({
-        cpf: "11144477735",
         email,
       })
     ).rejects.toMatchObject({ code: 11000 });
   });
 });
-

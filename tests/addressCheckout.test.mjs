@@ -10,6 +10,7 @@ import {
 
 import mongoose from "mongoose";
 import dotenv from "dotenv";
+import { gerarCpfTeste } from "./helpers/gerarCpfTeste.mjs";
 
 import User from "../src/models/User.js";
 import addressService from "../src/services/addressService.js";
@@ -41,7 +42,6 @@ function obterUriDeTeste() {
   }
 
   const url = new URL(uri);
-
   const banco = decodeURIComponent(
     url.pathname.replace(/^\//, "")
   );
@@ -55,25 +55,17 @@ function obterUriDeTeste() {
   return uri;
 }
 
-
-
 async function criarUsuario({
   ativo = true,
   comEndereco = true,
 } = {}) {
   const usuario = await User.create({
     nome: "Cliente Checkout Teste",
-
     email: `checkout-${new mongoose.Types.ObjectId()}@example.com`,
-
-    cpf: "52998224725",
-
+    cpf: gerarCpfTeste(),
     telefone: "11999999999",
-
     senhaHash: "hash-ficticio-para-teste",
-
     ativo,
-
     enderecos: comEndereco
       ? [
           {
@@ -98,7 +90,6 @@ async function criarUsuario({
   return usuario;
 }
 
-
 beforeAll(async () => {
   if (typeof obterEnderecoParaCheckout !== "function") {
     throw new Error(
@@ -118,7 +109,6 @@ beforeAll(async () => {
   await User.init();
 }, 30000);
 
-
 afterEach(async () => {
   if (
     mongoose.connection.readyState === 1 &&
@@ -132,7 +122,6 @@ afterEach(async () => {
     usuariosCriados.length = 0;
   }
 });
-
 
 afterAll(async () => {
   await mongoose.disconnect();
