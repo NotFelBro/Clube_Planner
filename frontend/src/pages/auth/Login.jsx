@@ -1,6 +1,13 @@
-
 import { useState } from "react";
-import { Link } from "react-router";
+
+import {
+  Link,
+  Navigate,
+  useLocation,
+  useNavigate,
+} from "react-router";
+
+import { useAuth } from "../../contexts/AuthContext.jsx";
 
 function PlannerIllustration() {
   return (
@@ -14,20 +21,148 @@ function PlannerIllustration() {
         <div className="ml-[18px] mt-3 h-1 w-[82px] rounded bg-[#e6e2d4]" />
         <div className="mx-[18px] mt-6 h-[60px] rounded-lg bg-[#fae7de]" />
       </div>
+
       <div className="absolute left-[190px] top-[60px] h-[145px] w-[65px] rounded-[10px] bg-terracotta shadow-sm" />
     </div>
   );
 }
 
 export default function Login() {
-  const [identifier, setIdentifier] = useState("");
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const origem = location.state?.from;
+
+  const destino =
+    typeof origem?.pathname === "string" &&
+    origem.pathname.startsWith("/") &&
+    !origem.pathname.startsWith("//") &&
+    !origem.pathname.startsWith("/\\")
+      ? {
+          pathname: origem.pathname,
+          search:
+            typeof origem.search === "string"
+              ? origem.search
+              : "",
+          hash:
+            typeof origem.hash === "string"
+              ? origem.hash
+              : "",
+        }
+      : "/perfil";
+
+  const {
+    entrar,
+    autenticado,
+    carregando,
+  } = useAuth();
+
+  const [identifier, setIdentifier] = useState(
+    typeof location.state?.email === "string"
+      ? location.state.email
+      : ""
+  );
+
   const [password, setPassword] = useState("");
   const [notice, setNotice] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [emailPendente, setEmailPendente] =
+    useState(false);
 
-  function handleSubmit(event) {
+  const emailConfirmado =
+    location.state?.emailConfirmado === true;
+
+  async function handleSubmit(event) {
     event.preventDefault();
-    setNotice(
-      "A autenticação estará disponível após a integração com o backend. Por enquanto, você pode explorar a loja como visitante."
+
+    if (submitting || carregando) {
+      return;
+    }
+
+    const identificador = identifier.trim();
+
+    if (!identificador || !password) {
+      setNotice(
+        "Informe seu e-mail ou CPF e sua senha."
+      );
+      return;
+    }
+
+    setSubmitting(true);
+    setNotice("");
+    setEmailPendente(false);
+
+    try {
+      const usuario = await entrar(
+        identificador,
+        password
+      );
+
+      if (!usuario) {
+        setNotice(
+          "Não foi possível concluir a autenticação. Tente novamente."
+        );
+        return;
+      }
+
+      setPassword("");
+
+      navigate(destino, {
+        replace: true,
+      });
+    } catch (error) {
+      const mensagem =
+        error?.message ||
+        "Não foi possível entrar na sua conta. Tente novamente.";
+
+      setNotice(mensagem);
+
+      // O backend retorna 403 quando
+      // a conta precisa confirmar o e-mail.
+      // Verificamos também a mensagem para não
+      // confundir com outras restrições de acesso.
+      const precisaVerificarEmail =
+        error?.status === 403 &&
+        /confirme seu e-mail/i.test(mensagem);
+
+      setEmailPendente(precisaVerificarEmail);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function irParaVerificacao() {
+    const identificador = identifier.trim();
+
+    navigate("/verificar-email", {
+      state: {
+        email: identificador.includes("@")
+          ? identificador
+          : "",
+        origem: "login",
+      },
+    });
+  }
+
+  if (carregando) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-sand px-5 text-slatebrand">
+        <p
+          role="status"
+          className="text-sm text-muted"
+        >
+          Verificando sua sessão...
+        </p>
+      </main>
+    );
+  }
+
+  if (autenticado) {
+    return (
+      <Navigate
+        to={destino}
+        replace
+      />
     );
   }
 
@@ -39,7 +174,10 @@ export default function Login() {
           aria-label="Clube Planner — início"
           className="inline-flex w-fit items-center gap-2 font-display text-xl font-semibold tracking-wide"
         >
-          CLUBE <span className="text-sage">PLANNER</span>
+          CLUBE{" "}
+          <span className="text-sage">
+            PLANNER
+          </span>
         </Link>
 
         <div className="mx-auto flex w-full max-w-[490px] flex-1 flex-col justify-center py-12 lg:py-8">
@@ -49,12 +187,14 @@ export default function Login() {
 
           <h1 className="font-display text-3xl font-semibold leading-[1.45] sm:text-4xl">
             Seu próximo capítulo
-            <span className="block">começa por aqui.</span>
+            <span className="block">
+              começa por aqui.
+            </span>
           </h1>
 
           <p className="mt-8 max-w-[450px] text-[15px] leading-7">
-            Entre para acompanhar seus pedidos, salvar favoritos e organizar
-            suas ideias.
+            Entre para acompanhar seus pedidos,
+            salvar favoritos e organizar suas ideias.
           </p>
 
           <div className="mt-14 hidden sm:block">
@@ -74,8 +214,20 @@ export default function Login() {
           </h2>
 
           <p className="mt-2 text-sm text-muted">
-            Que bom ter você por aqui. Vamos continuar?
+            Que bom ter você por aqui.
+            Vamos continuar?
           </p>
+
+          {emailConfirmado && (
+            <div
+              role="status"
+              className="mt-6 rounded-lg border border-sage bg-[#e8f1e8] p-4 text-sm text-slatebrand"
+            >
+              Seu e-mail foi confirmado!
+              Entre com sua senha para acessar
+              sua conta.
+            </div>
+          )}
 
           <div className="mt-12 flex gap-9 border-b border-[#e6e2d4]">
             <span className="border-b-[3px] border-terracotta pb-3 text-base font-semibold">
@@ -90,7 +242,10 @@ export default function Login() {
             </Link>
           </div>
 
-          <form onSubmit={handleSubmit} className="mt-6">
+          <form
+            onSubmit={handleSubmit}
+            className="mt-6"
+          >
             <div>
               <label
                 htmlFor="login-identifier"
@@ -104,10 +259,15 @@ export default function Login() {
                 type="text"
                 autoComplete="username"
                 value={identifier}
-                onChange={(event) => setIdentifier(event.target.value)}
+                onChange={(event) => {
+                  setIdentifier(event.target.value);
+                  setNotice("");
+                  setEmailPendente(false);
+                }}
                 placeholder="Digite seu e-mail ou CPF"
                 required
-                className="h-[46px] w-full rounded-[10px] border-[1.5px] border-[#b8b2a6] bg-white px-3 text-sm text-slatebrand placeholder:text-muted"
+                disabled={submitting}
+                className="h-[46px] w-full rounded-[10px] border-[1.5px] border-[#b8b2a6] bg-white px-3 text-sm text-slatebrand placeholder:text-muted disabled:cursor-not-allowed disabled:opacity-60"
               />
             </div>
 
@@ -124,10 +284,15 @@ export default function Login() {
                 type="password"
                 autoComplete="current-password"
                 value={password}
-                onChange={(event) => setPassword(event.target.value)}
+                onChange={(event) => {
+                  setPassword(event.target.value);
+                  setNotice("");
+                  setEmailPendente(false);
+                }}
                 placeholder="Digite sua senha"
                 required
-                className="h-[46px] w-full rounded-[10px] border-[1.5px] border-[#b8b2a6] bg-white px-3 text-sm text-slatebrand placeholder:text-muted"
+                disabled={submitting}
+                className="h-[46px] w-full rounded-[10px] border-[1.5px] border-[#b8b2a6] bg-white px-3 text-sm text-slatebrand placeholder:text-muted disabled:cursor-not-allowed disabled:opacity-60"
               />
             </div>
 
@@ -142,18 +307,31 @@ export default function Login() {
 
             <button
               type="submit"
-              className="mt-6 h-[46px] w-full rounded-[11px] bg-terracotta px-4 text-sm font-semibold text-white transition hover:brightness-95"
+              disabled={submitting}
+              className="mt-6 h-[46px] w-full rounded-[11px] bg-terracotta px-4 text-sm font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Entrar na minha conta
+              {submitting
+                ? "Entrando na sua conta..."
+                : "Entrar na minha conta"}
             </button>
 
             {notice && (
               <p
-                role="status"
-                className="mt-4 rounded-lg border border-sage bg-[#e8f1e8] p-3 text-sm text-slatebrand"
+                role="alert"
+                className="mt-4 rounded-lg border border-[#d6a29a] bg-[#fff0ed] p-3 text-sm text-[#8f3029]"
               >
                 {notice}
               </p>
+            )}
+
+            {emailPendente && (
+              <button
+                type="button"
+                onClick={irParaVerificacao}
+                className="mt-4 w-full rounded-[11px] border border-terracotta bg-white px-4 py-3 text-sm font-semibold text-terracotta transition hover:bg-[#fae7de]"
+              >
+                Confirmar meu e-mail
+              </button>
             )}
           </form>
 
@@ -182,13 +360,16 @@ export default function Login() {
             <p className="text-[13px] font-semibold text-[#2d6a4f]">
               Compra segura
             </p>
+
             <p className="mt-2 text-xs text-[#2b2d3f]">
-              Seus dados são tratados com cuidado e privacidade.
+              Seus dados são tratados com cuidado
+              e privacidade.
             </p>
           </div>
 
           <p className="mt-16 text-[11px] leading-5 text-muted">
-            Ao continuar, você concorda com os Termos de Uso e a Política de
+            Ao continuar, você concorda com
+            os Termos de Uso e a Política de
             Privacidade.
           </p>
         </div>

@@ -1,3 +1,4 @@
+
 const mongoose = require("mongoose");
 
 function validarCPF(valor) {
@@ -16,7 +17,6 @@ function validarCPF(valor) {
     }
 
     const resto = (soma * 10) % 11;
-
     return resto === 10 ? 0 : resto;
   };
 
@@ -33,52 +33,43 @@ const enderecoSchema = new mongoose.Schema(
       required: true,
       match: /^\d{8}$/,
     },
-
     logradouro: {
       type: String,
       required: true,
       trim: true,
     },
-
     numero: {
       type: String,
       required: true,
       trim: true,
     },
-
     complemento: {
       type: String,
       trim: true,
       default: "",
     },
-
     bairro: {
       type: String,
       required: true,
       trim: true,
     },
-
     cidade: {
       type: String,
       required: true,
       trim: true,
     },
-
     estado: {
       type: String,
       required: true,
       uppercase: true,
       match: /^[A-Z]{2}$/,
     },
-
     principal: {
       type: Boolean,
       default: false,
     },
   },
-  {
-    _id: true,
-  }
+  { _id: true }
 );
 
 const userSchema = new mongoose.Schema(
@@ -98,21 +89,19 @@ const userSchema = new mongoose.Schema(
       trim: true,
     },
 
-    
-cpf: {
-  type: String,
-  required: true,
-  trim: true,
-  set: (valor) =>
-    typeof valor === "string"
-      ? valor.replace(/\D/g, "")
-      : valor,
-  validate: {
-    validator: validarCPF,
-    message: "CPF inválido.",
-  },
-},
-
+    cpf: {
+      type: String,
+      required: true,
+      trim: true,
+      set: (valor) =>
+        typeof valor === "string"
+          ? valor.replace(/\D/g, "")
+          : valor,
+      validate: {
+        validator: validarCPF,
+        message: "CPF inválido.",
+      },
+    },
 
     telefone: {
       type: String,
@@ -137,6 +126,41 @@ cpf: {
       default: true,
     },
 
+    // Contas antigas sem este campo serão
+    // tratadas como verificadas na migração.
+    emailVerificado: {
+      type: Boolean,
+      default: false,
+    },
+
+    emailVerificadoEm: {
+      type: Date,
+      default: null,
+    },
+
+    verificacaoEmail: {
+      codigoHash: {
+        type: String,
+        select: false,
+        default: null,
+      },
+      expiraEm: {
+        type: Date,
+        select: false,
+        default: null,
+      },
+      ultimoEnvioEm: {
+        type: Date,
+        select: false,
+        default: null,
+      },
+      tentativas: {
+        type: Number,
+        select: false,
+        default: 0,
+      },
+    },
+
     enderecos: {
       type: [enderecoSchema],
       default: [],
@@ -148,22 +172,10 @@ cpf: {
   }
 );
 
-
-/**
- * Valida a quantidade de endereços principais.
- *
- * Sem endereços: nenhum principal.
- * Com endereços: exatamente um principal.
- */
 userSchema.path("enderecos").validate(
   function (enderecos) {
-    if (!Array.isArray(enderecos)) {
-      return false;
-    }
-
-    if (enderecos.length === 0) {
-      return true;
-    }
+    if (!Array.isArray(enderecos)) return false;
+    if (enderecos.length === 0) return true;
 
     const quantidadePrincipais = enderecos.filter(
       (endereco) => endereco.principal === true
@@ -174,21 +186,9 @@ userSchema.path("enderecos").validate(
   "O usuário deve possuir exatamente um endereço principal quando houver endereços cadastrados."
 );
 
-
-
-// CPF único entre todos os usuários.
-userSchema.index(
-  { cpf: 1 },
-  { unique: true }
-);
-
-// E-mail único entre todos os usuários.
-userSchema.index(
-  { email: 1 },
-  { unique: true }
-);
-
+userSchema.index({ cpf: 1 }, { unique: true });
+userSchema.index({ email: 1 }, { unique: true });
 
 module.exports =
-  mongoose.models.User || mongoose.model("User", userSchema);
-
+  mongoose.models.User ||
+  mongoose.model("User", userSchema);

@@ -6,7 +6,7 @@ import {
   useParams,
 } from "react-router";
 
-import { useStore } from "../../components/layout/StoreLayout.jsx";
+import { useStore } from "../../components/layout/StoreContext.js";
 import {
   formatPrice,
   getProductById,
@@ -45,7 +45,9 @@ function ProductIllustration({ product, view = 0 }) {
         className="flex aspect-[3/4] w-[45%] max-w-[190px] flex-col items-center justify-center rounded-xl shadow-md transition-transform"
         style={{
           backgroundColor: product.color || "#81B29A",
-          transform: `rotate(${view === 1 ? -7 : view === 2 ? 7 : 0}deg)`,
+          transform: `rotate(${
+            view === 1 ? -7 : view === 2 ? 7 : 0
+          }deg)`,
         }}
       >
         <span className="text-center text-lg font-bold text-white">
@@ -61,6 +63,11 @@ function ProductIllustration({ product, view = 0 }) {
 
 export default function ProductDetail() {
   const { id } = useParams();
+
+  return <ProductDetailContent key={id} id={id} />;
+}
+
+function ProductDetailContent({ id }) {
   const navigate = useNavigate();
   const product = getProductById(id);
 
@@ -76,10 +83,6 @@ export default function ProductDetail() {
   const [added, setAdded] = useState(false);
 
   useEffect(() => {
-    setQuantity(1);
-    setSelectedView(0);
-    setMessage("");
-    setAdded(false);
     window.scrollTo(0, 0);
   }, [id]);
 
@@ -114,7 +117,9 @@ export default function ProductDetail() {
     setAdded(true);
     setMessage(
       `${quantity} ${
-        quantity === 1 ? "unidade adicionada" : "unidades adicionadas"
+        quantity === 1
+          ? "unidade adicionada"
+          : "unidades adicionadas"
       } à sacola.`
     );
   }
@@ -209,7 +214,9 @@ export default function ProductDetail() {
                 }
                 aria-pressed={isFavorite}
                 className={`rounded-full bg-[#fae7de] p-3 ${
-                  isFavorite ? "text-red-600" : "text-terracotta"
+                  isFavorite
+                    ? "text-red-600"
+                    : "text-terracotta"
                 }`}
               >
                 <Heart filled={isFavorite} />
@@ -273,7 +280,9 @@ export default function ProductDetail() {
                 aria-label="Diminuir quantidade"
                 disabled={quantity <= 1}
                 onClick={() =>
-                  setQuantity((value) => Math.max(1, value - 1))
+                  setQuantity((value) =>
+                    Math.max(1, value - 1)
+                  )
                 }
                 className="h-10 w-10 rounded-lg border border-line disabled:opacity-40"
               >
@@ -289,7 +298,9 @@ export default function ProductDetail() {
                 aria-label="Aumentar quantidade"
                 disabled={quantity >= 99}
                 onClick={() =>
-                  setQuantity((value) => Math.min(99, value + 1))
+                  setQuantity((value) =>
+                    Math.min(99, value + 1)
+                  )
                 }
                 className="h-10 w-10 rounded-lg border border-line disabled:opacity-40"
               >
@@ -315,7 +326,9 @@ export default function ProductDetail() {
                     : "border-line bg-white hover:border-sage hover:bg-softsage"
                 }`}
               >
-                {added ? "✓ Adicionado à sacola" : "Adicionar à sacola"}
+                {added
+                  ? "✓ Adicionado à sacola"
+                  : "Adicionar à sacola"}
               </button>
 
               <button

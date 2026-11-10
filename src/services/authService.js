@@ -77,6 +77,14 @@ function usuarioPublico(usuario) {
   };
 }
 
+function usuarioPerfil(usuario) {
+  return {
+    ...usuarioPublico(usuario),
+    cpf: usuario.cpf,
+    telefone: usuario.telefone,
+  };
+}
+
 async function cadastrarUsuario(dados = {}) {
   const nome = validarTexto(
     dados.nome,
@@ -124,6 +132,8 @@ async function cadastrarUsuario(dados = {}) {
       senhaHash,
       role: "client",
       ativo: true,
+      emailVerificado: false,
+      emailVerificadoEm: null,
     });
   } catch (erro) {
     if (erro.code === 11000) {
@@ -160,6 +170,7 @@ async function autenticarUsuario(dados = {}) {
   }
 
   const valor = identificador.trim();
+
   const filtro = valor.includes("@")
     ? { email: valor.toLowerCase() }
     : { cpf: valor.replace(/\D/g, "") };
@@ -191,6 +202,13 @@ async function autenticarUsuario(dados = {}) {
     );
   }
 
+  if (usuario.emailVerificado === false) {
+    throw new AuthError(
+      "Confirme seu e-mail antes de entrar. Solicite um código de verificação.",
+      403
+    );
+  }
+
   const sessao = await criarSessao({
     userId: usuario._id,
   });
@@ -201,8 +219,102 @@ async function autenticarUsuario(dados = {}) {
   };
 }
 
+async function atualizarDadosPessoais(userId, dados) {
+  if (
+    !dados ||
+    typeof dados !== "object" ||
+    Array.isArray(dados)
+  ) {
+    throw new AuthError(
+      "Dados de atualização inválidos."
+    );
+  }
+
+  const camposPermitidos = ["nome", "telefone"];
+  const camposRecebidos = Object.keys(dados);
+
+  if (camposRecebidos.length === 0) {
+    throw new AuthError(
+      "Informe os dados que deseja atualizar."
+    );
+  }
+
+  const camposInvalidos = camposRecebidos.filter(
+    (campo) => !camposPermitidos.includes(campo)
+  );
+
+  if (camposInvalidos.length > 0) {
+    throw new AuthError(
+      "Apenas nome e telefone podem ser alterados por esta operação."
+    );
+  }
+
+  const alteracoes = {};
+
+  if (Object.hasOwn(dados, "nome")) {
+    alteracoes.nome = validarTexto(
+      dados.nome,
+      "Nome",
+      3,
+      120
+    );
+  }
+
+  if (Object.hasOwn(dados, "telefone")) {
+    if (typeof dados.telefone !== "string") {
+      throw new AuthError("Telefone inválido.");
+    }
+
+    const telefone = dados.telefone.replace(/\D/g, "");
+
+    if (!/^\d{10,11}$/.test(telefone)) {
+      throw new AuthError(
+        "Informe um telefone válido com DDD."
+      );
+    }
+
+    alteracoes.telefone = telefone;
+  }
+
+  let usuario;
+
+  try {
+    usuario = await User.findOneAndUpdate(
+      {
+        _id: userId,
+        ativo: true,
+      },
+      {
+        $set: alteracoes,
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
+  } catch (erro) {
+    if (erro.name === "ValidationError") {
+      throw new AuthError(
+        "Dados de atualização inválidos."
+      );
+    }
+
+    throw erro;
+  }
+
+  if (!usuario) {
+    throw new AuthError(
+      "Usuário não encontrado ou inativo.",
+      401
+    );
+  }
+
+  return usuarioPerfil(usuario);
+}
+
 module.exports = {
   AuthError,
   cadastrarUsuario,
   autenticarUsuario,
+  atualizarDadosPessoais,
 };

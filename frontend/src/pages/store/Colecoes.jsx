@@ -2,7 +2,7 @@
 import { Link, useSearchParams } from "react-router";
 
 import { products, formatPrice } from "../../data/products.js";
-import { useStore } from "../../components/layout/StoreLayout.jsx";
+import { useStore } from "../../components/layout/StoreContext.js";
 
 const categoryNames = {
   planners: "Planners & agendas",

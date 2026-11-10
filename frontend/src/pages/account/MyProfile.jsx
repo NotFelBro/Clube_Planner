@@ -1,8 +1,11 @@
 
 import { useState } from "react";
 import { Link, NavLink, useLocation } from "react-router";
-import { useStore } from "../../components/layout/StoreLayout.jsx";
+import { useStore } from "../../components/layout/StoreContext.js";
 import { formatPrice } from "../../data/products.js";
+
+import LogoutButton from "../../components/auth/LogoutButton.jsx";
+import PersonalData from "../../components/account/PersonalData.jsx";
 
 const menuItems = [
   { label: "Visão geral", icon: "⌂", to: "/perfil" },
@@ -74,6 +77,7 @@ function EmptyState({
   );
 }
 
+
 function Sidebar() {
   return (
     <aside className="self-start rounded-2xl bg-white p-5 lg:sticky lg:top-36">
@@ -92,7 +96,10 @@ function Sidebar() {
         </div>
       </div>
 
-      <nav aria-label="Menu da minha conta" className="space-y-2">
+      <nav
+        aria-label="Menu da minha conta"
+        className="space-y-2"
+      >
         {menuItems.map((item) => (
           <NavLink
             key={item.to}
@@ -106,23 +113,24 @@ function Sidebar() {
               }`
             }
           >
-            <span aria-hidden="true" className="w-5 text-center text-lg">
+            <span
+              aria-hidden="true"
+              className="w-5 text-center text-lg"
+            >
               {item.icon}
             </span>
+
             {item.label}
           </NavLink>
         ))}
       </nav>
 
-      <Link
-        to="/"
-        className="mt-8 inline-flex rounded-lg px-4 py-3 text-sm font-semibold hover:bg-softsage"
-      >
-        Ir para o login
-      </Link>
+      {/* Encerramento seguro da sessão */}
+      <LogoutButton />
     </aside>
   );
 }
+
 
 function SummaryCard({ title, value, to, color }) {
   return (
@@ -146,130 +154,7 @@ function SummaryCard({ title, value, to, color }) {
   );
 }
 
-function PersonalData() {
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    cpf: "",
-    phone: "",
-  });
 
-  const [notice, setNotice] = useState("");
-
-  function update(field, value) {
-    setForm((previous) => ({
-      ...previous,
-      [field]: value,
-    }));
-    setNotice("");
-  }
-
-  function submit(event) {
-    event.preventDefault();
-    setNotice(
-      "Os dados ainda não foram enviados ao servidor. A edição será habilitada após a integração da conta autenticada."
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      <Panel
-        title="Dados pessoais"
-        description="Mantenha suas informações atualizadas."
-      >
-        <form onSubmit={submit} className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="text-xs text-muted">
-              Nome completo
-              <input
-                className={fieldClass}
-                value={form.name}
-                onChange={(event) =>
-                  update("name", event.target.value)
-                }
-                placeholder="Seu nome"
-                autoComplete="name"
-              />
-            </label>
-
-            <label className="text-xs text-muted">
-              E-mail
-              <input
-                type="email"
-                className={fieldClass}
-                value={form.email}
-                onChange={(event) =>
-                  update("email", event.target.value)
-                }
-                placeholder="voce@email.com"
-                autoComplete="email"
-              />
-            </label>
-
-            <label className="text-xs text-muted">
-              CPF
-              <input
-                className={fieldClass}
-                value={form.cpf}
-                onChange={(event) =>
-                  update(
-                    "cpf",
-                    event.target.value.replace(/\D/g, "").slice(0, 11)
-                  )
-                }
-                placeholder="Somente números"
-                inputMode="numeric"
-                maxLength={11}
-              />
-            </label>
-
-            <label className="text-xs text-muted">
-              Telefone
-              <input
-                type="tel"
-                className={fieldClass}
-                value={form.phone}
-                onChange={(event) =>
-                  update("phone", event.target.value)
-                }
-                placeholder="(00) 00000-0000"
-                autoComplete="tel"
-              />
-            </label>
-          </div>
-
-          <button type="submit" className={primaryButton}>
-            Salvar alterações
-          </button>
-
-          {notice && (
-            <p role="status" className="rounded-lg bg-softsage p-3 text-sm">
-              {notice}
-            </p>
-          )}
-        </form>
-      </Panel>
-
-      <Panel
-        title="Meus cartões"
-        description="Consulte os métodos de pagamento vinculados à sua conta."
-      >
-        <div className="rounded-xl bg-sand p-5">
-          <p className="font-semibold">Nenhum cartão vinculado</p>
-          <p className="mt-2 text-sm leading-6 text-muted">
-            Os cartões utilizados nas compras aparecerão aqui
-            somente quando o provedor de pagamento disponibilizar
-            um método de pagamento salvo e autorizado.
-          </p>
-          <p className="mt-3 text-xs text-muted">
-            O Clube Planner não deve armazenar números completos
-            de cartões nem códigos de segurança.
-          </p>
-        </div>
-      </Panel>
-    </div>
-  );
-}
 
 function Overview() {
   const { favorites } = useStore();

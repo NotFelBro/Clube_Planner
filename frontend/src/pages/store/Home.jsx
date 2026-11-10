@@ -6,7 +6,7 @@ import {
 } from "react-router";
 
 import HeroCarousel from "../../components/store/HeroCarousel.jsx";
-import { useStore } from "../../components/layout/StoreLayout.jsx";
+import { useStore } from "../../components/layout/StoreContext.js";
 import {
   products,
   formatPrice,

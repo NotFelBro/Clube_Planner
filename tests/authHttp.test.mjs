@@ -1,9 +1,10 @@
-
 import {
   describe,
   it,
   expect,
+  vi,
   beforeAll,
+  beforeEach,
   afterAll,
   afterEach,
 } from "vitest";
@@ -22,13 +23,19 @@ const app = require("../src/app.js");
 const User = require("../src/models/User.js");
 const Session = require("../src/models/session.js");
 
+const emailService = require(
+  "../src/services/emailService.js"
+);
+
+const enviarEmailOriginal =
+  emailService.enviarCodigoVerificacao;
+
 const ROTA_CADASTRO = "/api/v1/auth/register";
 const ROTA_LOGIN = "/api/v1/auth/login";
 
 const SENHA_VALIDA = "SenhaSegura@2026!";
 
 const usuariosCriados = new Set();
-
 
 function obterUriDeTeste() {
   if (process.env.NODE_ENV !== "test") {
@@ -112,8 +119,6 @@ async function cadastrarPelaAPI(alteracoes = {}) {
       resposta.body.data.usuario.id
     );
   } else {
-    // Protege contra falhas ocorridas após
-    // uma eventual gravação no banco.
     const usuario = await User.findOne({
       email: dados.email.toLowerCase(),
       cpf: dados.cpf,
@@ -141,6 +146,31 @@ async function cadastrarUsuarioValido() {
   return resultado;
 }
 
+// Exclusivo dos testes de autenticação:
+// representa um usuário que já confirmou o e-mail.
+async function cadastrarUsuarioVerificado() {
+  const resultado = await cadastrarUsuarioValido();
+
+  const atualizacao = await User.updateOne(
+    {
+      _id: resultado.resposta.body.data.usuario.id,
+      email: resultado.dados.email,
+      emailVerificado: false,
+    },
+    {
+      $set: {
+        emailVerificado: true,
+        emailVerificadoEm: new Date(),
+      },
+    }
+  );
+
+  expect(atualizacao.matchedCount).toBe(1);
+  expect(atualizacao.modifiedCount).toBe(1);
+
+  return resultado;
+}
+
 beforeAll(async () => {
   const uri = obterUriDeTeste();
 
@@ -163,7 +193,16 @@ beforeAll(async () => {
   await Session.init();
 }, 30000);
 
+beforeEach(() => {
+  emailService.enviarCodigoVerificacao = vi
+    .fn()
+    .mockResolvedValue(undefined);
+});
+
 afterEach(async () => {
+  emailService.enviarCodigoVerificacao =
+    enviarEmailOriginal;
+
   if (usuariosCriados.size === 0) {
     return;
   }
@@ -182,28 +221,25 @@ afterEach(async () => {
     (id) => new mongoose.Types.ObjectId(id)
   );
 
-  // Excluir primeiro as sessões pertencentes
-  // exclusivamente aos usuários desta suíte.
   await Session.deleteMany({
     userId: {
       $in: ids,
     },
   });
 
-  // Excluir somente os usuários rastreados
-  // durante os testes HTTP.
   await User.deleteMany({
     _id: {
       $in: ids,
     },
   });
 
-  // Limpar o rastreamento somente depois
-  // da exclusão bem-sucedida.
   usuariosCriados.clear();
 });
 
 afterAll(async () => {
+  emailService.enviarCodigoVerificacao =
+    enviarEmailOriginal;
+
   await mongoose.disconnect();
 });
 
@@ -227,9 +263,13 @@ describe("RF-01 — Cadastro HTTP", () => {
     }).select("+senhaHash");
 
     expect(usuario).not.toBeNull();
+
     expect(usuario.senhaHash).not.toBe(
       dados.senha
     );
+
+    expect(usuario.emailVerificado).toBe(false);
+    expect(usuario.emailVerificadoEm).toBeNull();
 
     expect(
       resposta.body.data.usuario
@@ -342,12 +382,90 @@ describe("RF-01 — Cadastro HTTP", () => {
       "senhaHash"
     );
   });
+
+  it("envia código automaticamente após cadastro válido", async () => {
+    const { dados, resposta } =
+      await cadastrarUsuarioValido();
+
+    expect(resposta.body.data.codigoEnviado).toBe(true);
+
+    expect(
+      emailService.enviarCodigoVerificacao
+    ).toHaveBeenCalledOnce();
+
+    expect(
+      emailService.enviarCodigoVerificacao
+    ).toHaveBeenCalledWith(
+      dados.email,
+      expect.stringMatching(/^\d{6}$/)
+    );
+
+    const usuario = await User.findOne({
+      email: dados.email,
+    }).select(
+      "+verificacaoEmail.codigoHash " +
+      "+verificacaoEmail.expiraEm"
+    );
+
+    expect(usuario).not.toBeNull();
+    expect(usuario.emailVerificado).toBe(false);
+
+    expect(
+      usuario.verificacaoEmail.codigoHash
+    ).toBeTruthy();
+
+    expect(
+      usuario.verificacaoEmail.expiraEm
+    ).toBeInstanceOf(Date);
+  });
+
+  it("mantém o cadastro quando o SMTP falha", async () => {
+    emailService.enviarCodigoVerificacao = vi
+      .fn()
+      .mockRejectedValue(
+        new Error("Falha SMTP simulada")
+      );
+
+    const { dados, resposta } =
+      await cadastrarPelaAPI();
+
+    expect(resposta.status).toBe(201);
+    expect(resposta.body.success).toBe(true);
+
+    expect(
+      resposta.body.data.codigoEnviado
+    ).toBe(false);
+
+    expect(resposta.body.message).toContain(
+      "não foi possível enviar o código"
+    );
+
+    const usuario = await User.findOne({
+      email: dados.email,
+    });
+
+    expect(usuario).not.toBeNull();
+    expect(usuario.emailVerificado).toBe(false);
+  });
+
+  it("não envia código quando o cadastro é inválido", async () => {
+    const { resposta } =
+      await cadastrarPelaAPI({
+        senha: "curta",
+      });
+
+    expect(resposta.status).toBe(400);
+
+    expect(
+      emailService.enviarCodigoVerificacao
+    ).not.toHaveBeenCalled();
+  });
 });
 
 describe("RF-02 — Login HTTP", () => {
   it("autentica usuário por e-mail", async () => {
     const { dados } =
-      await cadastrarUsuarioValido();
+      await cadastrarUsuarioVerificado();
 
     const resposta = await request(app)
       .post(ROTA_LOGIN)
@@ -374,7 +492,7 @@ describe("RF-02 — Login HTTP", () => {
 
   it("autentica usuário por CPF", async () => {
     const { dados } =
-      await cadastrarUsuarioValido();
+      await cadastrarUsuarioVerificado();
 
     const resposta = await request(app)
       .post(ROTA_LOGIN)
@@ -429,7 +547,7 @@ describe("RF-02 — Login HTTP", () => {
 
   it("configura o refresh token em cookie HTTP-only", async () => {
     const { dados } =
-      await cadastrarUsuarioValido();
+      await cadastrarUsuarioVerificado();
 
     const resposta = await request(app)
       .post(ROTA_LOGIN)
@@ -469,5 +587,35 @@ describe("RF-02 — Login HTTP", () => {
     expect(
       resposta.body.data.usuario
     ).not.toHaveProperty("senhaHash");
+  });
+
+  it("bloqueia login sem verificação de e-mail", async () => {
+    const { dados, resposta: cadastro } =
+      await cadastrarUsuarioValido();
+
+    const resposta = await request(app)
+      .post(ROTA_LOGIN)
+      .send({
+        identificador: dados.email,
+        senha: dados.senha,
+      });
+
+    expect(resposta.status).toBe(403);
+    expect(resposta.body.success).toBe(false);
+
+    expect(resposta.body.message).toContain(
+      "Confirme seu e-mail"
+    );
+
+    expect(
+      resposta.body.data?.accessToken
+    ).toBeUndefined();
+
+    const quantidadeSessoes =
+      await Session.countDocuments({
+        userId: cadastro.body.data.usuario.id,
+      });
+
+    expect(quantidadeSessoes).toBe(0);
   });
 });

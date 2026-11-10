@@ -1,6 +1,16 @@
-
 import { useState } from "react";
-import { Link } from "react-router";
+import {
+  Link,
+  Navigate,
+  useNavigate,
+} from "react-router";
+
+import {
+  cadastrarCliente,
+  CadastroApiError,
+} from "../../services/cadastroApi.js";
+
+import { useAuth } from "../../contexts/AuthContext.jsx";
 
 function PlannerIllustration() {
   return (
@@ -30,6 +40,7 @@ function FormField({
   autoComplete,
   maxLength,
   inputMode,
+  disabled = false,
 }) {
   return (
     <div className="min-w-0">
@@ -50,15 +61,18 @@ function FormField({
         autoComplete={autoComplete}
         maxLength={maxLength}
         inputMode={inputMode}
+        disabled={disabled}
         required
-        className="h-[46px] w-full rounded-[10px] border-[1.5px] border-[#b8b2a6] bg-white px-[13px] text-sm text-slatebrand outline-offset-2 placeholder:text-muted focus:border-sage"
+        className="h-[46px] w-full rounded-[10px] border-[1.5px] border-[#b8b2a6] bg-white px-[13px] text-sm text-slatebrand outline-offset-2 placeholder:text-muted focus:border-sage disabled:cursor-not-allowed disabled:opacity-60"
       />
     </div>
   );
 }
 
 function formatPhone(value) {
-  const digits = value.replace(/\D/g, "").slice(0, 11);
+  const digits = value
+    .replace(/\D/g, "")
+    .slice(0, 11);
 
   if (digits.length <= 2) {
     return digits ? `(${digits}` : "";
@@ -76,7 +90,9 @@ function formatPhone(value) {
 }
 
 function formatCPF(value) {
-  const digits = value.replace(/\D/g, "").slice(0, 11);
+  const digits = value
+    .replace(/\D/g, "")
+    .slice(0, 11);
 
   return digits
     .replace(/^(\d{3})(\d)/, "$1.$2")
@@ -87,7 +103,10 @@ function formatCPF(value) {
 function isValidCPF(value) {
   const cpf = value.replace(/\D/g, "");
 
-  if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) {
+  if (
+    cpf.length !== 11 ||
+    /^(\d)\1{10}$/.test(cpf)
+  ) {
     return false;
   }
 
@@ -97,12 +116,14 @@ function isValidCPF(value) {
       .split("")
       .reduce(
         (total, digit, index) =>
-          total + Number(digit) * (length + 1 - index),
+          total +
+          Number(digit) * (length + 1 - index),
         0
       );
 
     const remainder = (sum * 10) % 11;
-    const expected = remainder === 10 ? 0 : remainder;
+    const expected =
+      remainder === 10 ? 0 : remainder;
 
     if (expected !== Number(cpf[length])) {
       return false;
@@ -112,21 +133,37 @@ function isValidCPF(value) {
   return true;
 }
 
-export default function Cadastro() {
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    cpf: "",
-    password: "",
-    confirmPassword: "",
-  });
+const FORM_INICIAL = {
+  name: "",
+  email: "",
+  phone: "",
+  cpf: "",
+  password: "",
+  confirmPassword: "",
+};
 
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
+export default function Cadastro() {
+  const navigate = useNavigate();
+
+  const {
+    autenticado,
+    carregando,
+  } = useAuth();
+
+  const [form, setForm] = useState(FORM_INICIAL);
+
+  const [acceptedTerms, setAcceptedTerms] =
+    useState(false);
+
   const [message, setMessage] = useState("");
-  const [messageType, setMessageType] = useState("error");
+  const [submitting, setSubmitting] = useState(false);
+  const [registered, setRegistered] = useState(false);
 
   function updateField(field, value) {
+    if (submitting || registered) {
+      return;
+    }
+
     setForm((previous) => ({
       ...previous,
       [field]: value,
@@ -135,18 +172,28 @@ export default function Cadastro() {
     setMessage("");
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
 
-    setMessageType("error");
+    if (
+      submitting ||
+      registered ||
+      carregando
+    ) {
+      return;
+    }
 
     if (form.name.trim().length < 3) {
       setMessage("Informe seu nome completo.");
       return;
     }
 
-    if (form.phone.replace(/\D/g, "").length < 10) {
-      setMessage("Informe um telefone válido com DDD.");
+    if (
+      form.phone.replace(/\D/g, "").length < 10
+    ) {
+      setMessage(
+        "Informe um telefone válido com DDD."
+      );
       return;
     }
 
@@ -155,13 +202,24 @@ export default function Cadastro() {
       return;
     }
 
-    if (form.password.length < 8) {
-      setMessage("A senha deve conter pelo menos 8 caracteres.");
+    if (
+      form.password.length < 12 ||
+      new TextEncoder().encode(
+        form.password
+      ).length > 72
+    ) {
+      setMessage(
+        "A senha deve conter pelo menos 12 caracteres e no máximo 72 bytes."
+      );
       return;
     }
 
-    if (form.password !== form.confirmPassword) {
-      setMessage("As senhas informadas não coincidem.");
+    if (
+      form.password !== form.confirmPassword
+    ) {
+      setMessage(
+        "As senhas informadas não coincidem."
+      );
       return;
     }
 
@@ -172,23 +230,85 @@ export default function Cadastro() {
       return;
     }
 
-    setMessageType("info");
-    setMessage(
-      "Formulário validado. O cadastro real será disponibilizado após a implementação do backend. Nenhum dado foi enviado."
+    const email = form.email
+      .trim()
+      .toLowerCase();
+
+    setSubmitting(true);
+    setMessage("");
+
+    try {
+      const resultado = await cadastrarCliente({
+        nome: form.name.trim(),
+        email,
+        telefone: form.phone.replace(/\D/g, ""),
+        cpf: form.cpf.replace(/\D/g, ""),
+        senha: form.password,
+      });
+
+      // A conta já foi criada no banco.
+      // Não repetir o cadastro.
+      setRegistered(true);
+
+      // Remover a senha da memória do formulário.
+      setForm(FORM_INICIAL);
+
+      // O login só poderá ocorrer após a
+      // confirmação do e-mail.
+      navigate("/verificar-email", {
+        replace: true,
+        state: {
+          email:
+            resultado.usuario?.email || email,
+          codigoEnviado: resultado.codigoEnviado,
+          origem: "cadastro",
+        },
+      });
+    } catch (error) {
+      setMessage(
+        error instanceof CadastroApiError
+          ? error.message
+          : "Não foi possível concluir o cadastro. Tente novamente."
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (carregando) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-sand px-5 text-slatebrand">
+        <p
+          role="status"
+          className="text-sm text-muted"
+        >
+          Verificando sua sessão...
+        </p>
+      </main>
+    );
+  }
+
+  if (autenticado) {
+    return (
+      <Navigate to="/perfil" replace />
     );
   }
 
   return (
     <main className="grid min-h-screen bg-sand text-slatebrand lg:grid-cols-[38.8889%_61.1111%]">
-      {/* Painel esquerdo — identidade da marca */}
+      {/* Painel esquerdo */}
       <aside className="flex flex-col bg-slatebrand px-6 py-8 text-sand sm:px-12 lg:min-h-screen lg:px-[58px]">
         <Link
           to="/"
           aria-label="Clube Planner — voltar ao login"
           className="inline-flex w-fit items-center gap-1 font-display text-xl font-semibold"
         >
-          <span className="text-sand">Clube</span>
-          <span className="text-terracotta">Planner</span>
+          <span className="text-sand">
+            Clube
+          </span>
+          <span className="text-terracotta">
+            Planner
+          </span>
         </Link>
 
         <div className="flex flex-1 flex-col justify-center py-12 lg:py-0">
@@ -198,12 +318,15 @@ export default function Cadastro() {
 
           <h1 className="mt-9 max-w-[430px] font-display text-[32px] font-semibold leading-[1.4] sm:text-[38px]">
             Sua rotina, do
-            <span className="block">seu jeito.</span>
+            <span className="block">
+              seu jeito.
+            </span>
           </h1>
 
           <p className="mt-6 max-w-[430px] text-[15px] leading-[1.65]">
-            Crie sua conta para salvar favoritos, acompanhar pedidos e deixar
-            seus próximos planos ainda mais especiais.
+            Crie sua conta para salvar favoritos,
+            acompanhar pedidos e deixar seus
+            próximos planos ainda mais especiais.
           </p>
 
           <div className="mt-14 hidden sm:block lg:mt-20 lg:ml-[22px]">
@@ -216,7 +339,7 @@ export default function Cadastro() {
         </p>
       </aside>
 
-      {/* Painel direito — formulário de cadastro */}
+      {/* Painel direito */}
       <section className="flex items-center justify-center px-5 py-12 sm:px-10 lg:px-[60px]">
         <div className="w-full max-w-[560px]">
           <header>
@@ -225,7 +348,8 @@ export default function Cadastro() {
             </h2>
 
             <p className="mt-3 text-sm text-muted">
-              É rapidinho! Preencha seus dados para começar.
+              É rapidinho! Preencha seus dados
+              para começar.
             </p>
           </header>
 
@@ -244,7 +368,6 @@ export default function Cadastro() {
 
           <form
             onSubmit={handleSubmit}
-            noValidate={false}
             className="mt-7"
           >
             <div className="space-y-[15px]">
@@ -254,9 +377,15 @@ export default function Cadastro() {
                 placeholder="Como podemos chamar você?"
                 value={form.name}
                 onChange={(event) =>
-                  updateField("name", event.target.value)
+                  updateField(
+                    "name",
+                    event.target.value
+                  )
                 }
                 autoComplete="name"
+                disabled={
+                  submitting || registered
+                }
               />
 
               <FormField
@@ -266,9 +395,15 @@ export default function Cadastro() {
                 placeholder="voce@email.com"
                 value={form.email}
                 onChange={(event) =>
-                  updateField("email", event.target.value)
+                  updateField(
+                    "email",
+                    event.target.value
+                  )
                 }
                 autoComplete="email"
+                disabled={
+                  submitting || registered
+                }
               />
 
               <FormField
@@ -280,12 +415,17 @@ export default function Cadastro() {
                 onChange={(event) =>
                   updateField(
                     "phone",
-                    formatPhone(event.target.value)
+                    formatPhone(
+                      event.target.value
+                    )
                   )
                 }
                 autoComplete="tel"
                 inputMode="tel"
                 maxLength={15}
+                disabled={
+                  submitting || registered
+                }
               />
 
               <FormField
@@ -294,10 +434,18 @@ export default function Cadastro() {
                 placeholder="000.000.000-00"
                 value={form.cpf}
                 onChange={(event) =>
-                  updateField("cpf", formatCPF(event.target.value))
+                  updateField(
+                    "cpf",
+                    formatCPF(
+                      event.target.value
+                    )
+                  )
                 }
                 inputMode="numeric"
                 maxLength={14}
+                disabled={
+                  submitting || registered
+                }
               />
 
               <div className="grid gap-4 sm:grid-cols-2 sm:gap-5">
@@ -308,9 +456,15 @@ export default function Cadastro() {
                   placeholder="Crie uma senha segura"
                   value={form.password}
                   onChange={(event) =>
-                    updateField("password", event.target.value)
+                    updateField(
+                      "password",
+                      event.target.value
+                    )
                   }
                   autoComplete="new-password"
+                  disabled={
+                    submitting || registered
+                  }
                 />
 
                 <FormField
@@ -326,6 +480,9 @@ export default function Cadastro() {
                     )
                   }
                   autoComplete="new-password"
+                  disabled={
+                    submitting || registered
+                  }
                 />
               </div>
             </div>
@@ -335,42 +492,53 @@ export default function Cadastro() {
                 type="checkbox"
                 checked={acceptedTerms}
                 onChange={(event) => {
-                  setAcceptedTerms(event.target.checked);
+                  setAcceptedTerms(
+                    event.target.checked
+                  );
                   setMessage("");
                 }}
+                disabled={
+                  submitting || registered
+                }
                 className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-terracotta"
               />
 
               <span>
-                Li e aceito os Termos de Uso e a Política de
-                Privacidade.
+                Li e aceito os Termos de Uso
+                e a Política de Privacidade.
               </span>
             </label>
 
             <button
               type="submit"
-              className="mt-6 flex h-[46px] w-full items-center justify-center rounded-[11px] bg-terracotta px-4 text-sm font-semibold text-white transition hover:brightness-95"
+              disabled={
+                submitting || registered
+              }
+              className="mt-6 flex h-[46px] w-full items-center justify-center rounded-[11px] bg-terracotta px-4 text-sm font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Criar minha conta
+              {submitting
+                ? "Cadastrando..."
+                : registered
+                  ? "Cadastro concluído"
+                  : "Criar minha conta"}
             </button>
 
             {message && (
               <div
-                role="status"
+                role="alert"
                 aria-live="polite"
-                className={`mt-4 rounded-lg border p-3 text-sm ${
-                  messageType === "error"
-                    ? "border-terracotta bg-[#fae7de] text-slatebrand"
-                    : "border-sage bg-[#e8f1e8] text-slatebrand"
-                }`}
+                className="mt-4 rounded-lg border border-terracotta bg-[#fae7de] p-3 text-sm text-slatebrand"
               >
                 {message}
               </div>
             )}
           </form>
 
-          <p className="mt-6 text-xs text-muted">
-            Na próxima etapa, vamos confirmar seu e-mail e telefone.
+          <p className="mt-6 text-xs leading-5 text-muted">
+            Após criar sua conta, enviaremos
+            um código de verificação para
+            seu e-mail. A confirmação será
+            necessária antes do primeiro acesso.
           </p>
 
           <div className="mt-11 flex flex-wrap items-center gap-x-6 gap-y-2 text-[13px]">
@@ -387,8 +555,8 @@ export default function Cadastro() {
           </div>
 
           <p className="mt-20 text-[11px] leading-5 text-muted">
-            Seus dados são protegidos e utilizados conforme nossa política
-            de privacidade.
+            Seus dados são protegidos e utilizados
+            conforme nossa política de privacidade.
           </p>
         </div>
       </section>

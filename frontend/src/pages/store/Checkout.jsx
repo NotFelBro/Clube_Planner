@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 
-import { useStore } from "../../components/layout/StoreLayout.jsx";
+import { useStore } from "../../components/layout/StoreContext.js";
 import { formatPrice } from "../../data/products.js";
 
 const inputClass =

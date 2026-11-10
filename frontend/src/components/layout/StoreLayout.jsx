@@ -1,20 +1,7 @@
 
-import { createContext, useContext, useState } from "react";
+import { useState } from "react";
+import { StoreContext } from "./StoreContext.js";
 import { Link, NavLink, Outlet, useNavigate } from "react-router";
-
-const StoreContext = createContext(null);
-
-export function useStore() {
-  const context = useContext(StoreContext);
-
-  if (!context) {
-    throw new Error(
-      "useStore deve ser utilizado dentro de StoreLayout."
-    );
-  }
-
-  return context;
-}
 
 const categories = [
   { label: "Planners & agendas", category: "planners" },
