@@ -1,29 +1,35 @@
 
 import { useEffect, useState } from "react";
-import { Link } from "react-router";
 
 const banners = [
   {
     id: 1,
-    image: "/banners/banner-01.webp",
+    image: "/banners/banner-01.svg",
     alt: "Coleção de papelaria Clube Planner",
   },
   {
     id: 2,
-    image: "/banners/banner-02.webp",
+    image: "/banners/banner-02.svg",
     alt: "Planners, cadernos e acessórios de papelaria",
   },
   {
     id: 3,
-    image: "/banners/banner-03.webp",
+    image: "/banners/banner-03.svg",
     alt: "Produtos para organização e criatividade",
   },
 ];
 
-const SLIDE_INTERVAL = 5000;
+const SLIDE_INTERVAL = 3000;
 
-export default function HeroCarousel() {
-  const [activeIndex, setActiveIndex] = useState(0);
+export default function HeroCarousel({
+  compact = false,
+  title = "Planeje seus dias.",
+  subtitle = "Cultive suas ideias.",
+  description = "Planners, cadernos e pequenos detalhes para deixar sua rotina mais leve, bonita e organizada.",
+  label = "Destaques do Clube Planner",
+  initialSlide = 0,
+}) {
+  const [activeIndex, setActiveIndex] = useState(initialSlide);
   const [isPaused, setIsPaused] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
 
@@ -67,7 +73,7 @@ export default function HeroCarousel() {
 
   return (
     <section
-      aria-label="Destaques do Clube Planner"
+      aria-label={label}
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
       onFocusCapture={() => setIsPaused(true)}
@@ -101,10 +107,8 @@ export default function HeroCarousel() {
             <img
               src={banner.image}
               alt=""
-              loading={index === 0 ? "eager" : "lazy"}
-              fetchPriority={
-                index === 0 ? "high" : "auto"
-              }
+              loading={!compact && index === 0 ? "eager" : "lazy"}
+              fetchPriority={!compact && index === 0 ? "high" : "auto"}
               className="h-full w-full object-cover object-center"
             />
           </div>
@@ -115,40 +119,22 @@ export default function HeroCarousel() {
       </div>
 
       {/* Conteúdo fixo */}
-      <div className="relative z-10 flex min-h-[310px] flex-col justify-center px-6 py-9 sm:min-h-[340px] sm:px-10 lg:min-h-[360px] lg:px-12">
+      <div className={`relative z-10 flex flex-col justify-center ${compact
+        ? "min-h-[200px] px-5 py-8 sm:min-h-[210px] sm:px-8 lg:min-h-[220px] lg:px-10"
+        : "min-h-[310px] px-6 py-9 sm:min-h-[340px] sm:px-10 lg:min-h-[360px] lg:px-12"}`}>
         <div className="max-w-[560px]">
           <p className="text-xs font-semibold uppercase tracking-[0.08em] text-terracotta">
             Papelaria com afeto
           </p>
 
-          <h1 className="mt-6 font-display text-[30px] font-semibold leading-[1.25] text-slatebrand sm:text-[38px] lg:text-[42px]">
-            Planeje seus dias.
-            <span className="block">
-              Cultive suas ideias.
-            </span>
-          </h1>
+          {compact ? (
+            <h3 className="mt-3 max-w-lg font-display text-xl font-semibold leading-tight text-slatebrand sm:text-2xl lg:text-3xl">{title}<span className="block">{subtitle}</span></h3>
+          ) : (
+            <h1 className="mt-6 font-display text-[30px] font-semibold leading-[1.25] text-slatebrand sm:text-[38px] lg:text-[42px]">{title}<span className="block">{subtitle}</span></h1>
+          )}
+          <p className={`${compact ? "mt-3 max-w-md text-xs sm:text-sm" : "mt-5 max-w-[520px] text-sm sm:text-base"} leading-6 text-slatebrand`}>{description}</p>
 
-          <p className="mt-5 max-w-[520px] text-sm leading-6 text-slatebrand sm:text-base">
-            Planners, cadernos e pequenos detalhes para
-            deixar sua rotina mais leve, bonita e
-            organizada.
-          </p>
 
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            <Link
-              to="/colecoes"
-              className="inline-flex min-h-[44px] items-center justify-center rounded-[10px] bg-terracotta px-6 text-sm font-semibold text-white transition hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-terracotta"
-            >
-              Explorar coleção
-            </Link>
-
-            <Link
-              to="/novidades"
-              className="inline-flex min-h-[44px] items-center justify-center rounded-[10px] border border-line bg-white px-6 text-sm font-semibold text-slatebrand transition hover:bg-softsage focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-terracotta"
-            >
-              Ver novidades
-            </Link>
-          </div>
         </div>
       </div>
 
