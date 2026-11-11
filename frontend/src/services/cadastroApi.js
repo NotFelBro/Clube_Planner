@@ -42,7 +42,7 @@ async function requisitar(caminho, dados) {
   if (!response.ok || payload?.success !== true) {
     const fallback =
       response.status === 409
-        ? "E-mail ou CPF já cadastrado."
+        ? "E-mail já cadastrado."
         : response.status === 429
           ? "Muitas tentativas. Aguarde alguns minutos e tente novamente."
           : response.status === 503
