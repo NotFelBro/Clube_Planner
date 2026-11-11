@@ -8,6 +8,7 @@ const validarCentavos = {
 };
 
 const paymentSchema = new Schema({
+  providerUpdatedAt: { type: Date, default: null },
   orderId: {
     type: Schema.Types.ObjectId,
     ref: "Order",
@@ -47,7 +48,7 @@ const paymentSchema = new Schema({
 
   metodo: {
     type: String,
-    enum: ["pix", "cartao", "boleto"],
+    enum: ["pix", "cartao", "boleto", "outro"],
     required: true,
     immutable: true
   },
