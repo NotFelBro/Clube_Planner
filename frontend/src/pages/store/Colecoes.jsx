@@ -1,22 +1,22 @@
+import BrandLogo from "../../components/brand/BrandLogo.jsx";
 
 import { Link, useSearchParams } from "react-router";
 
-import { products, formatPrice } from "../../data/products.js";
+import { formatPrice } from "../../data/products.js";
 import { useStore } from "../../components/layout/StoreContext.js";
 
 const categoryNames = {
   planners: "Planners & agendas",
   cadernos: "Cadernos & blocos",
-  papelaria: "Papelaria criativa",
   canetas: "Canetas & acessórios",
-  organizacao: "Organização",
 };
 
 export default function Colecoes() {
   const [searchParams] = useSearchParams();
-  const { addToCart } = useStore();
+  const { addToCart, products } = useStore();
 
-  const category = searchParams.get("categoria");
+  const requestedCategory = searchParams.get("categoria");
+  const category = Object.hasOwn(categoryNames, requestedCategory) ? requestedCategory : null;
   const categoryName =
     categoryNames[category] ?? "Todas as coleções";
 
@@ -27,7 +27,7 @@ export default function Colecoes() {
     : products;
 
   return (
-    <main className="min-h-[65vh] bg-sand px-4 py-12 sm:px-6">
+    <main className="min-h-[65vh] px-4 py-12 sm:px-6">
       <div className="mx-auto max-w-[1320px]">
         <nav
           aria-label="Navegação estrutural"
@@ -50,9 +50,7 @@ export default function Colecoes() {
         <div className="rounded-2xl border border-line bg-white px-6 py-10 sm:px-10">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <span className="text-xs font-semibold uppercase tracking-widest text-terracotta">
-                Clube Planner
-              </span>
+              <BrandLogo className="w-44" />
 
               <h1 className="mt-3 font-display text-3xl font-semibold text-slatebrand">
                 {categoryName}
@@ -78,7 +76,7 @@ export default function Colecoes() {
             {filteredProducts.map((product) => (
               <article
                 key={product.id}
-                className="flex flex-col rounded-2xl border border-line bg-white p-4"
+                className="product-hover flex flex-col rounded-2xl border border-line bg-white p-4"
               >
                 <div
                   className="flex h-40 items-center justify-center rounded-xl"
