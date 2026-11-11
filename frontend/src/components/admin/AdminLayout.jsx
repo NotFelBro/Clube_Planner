@@ -1,3 +1,4 @@
+import BrandLogo from "../brand/BrandLogo.jsx";
 
 import { useState } from "react";
 import {
@@ -58,25 +59,8 @@ export default function AdminLayout({
         }`}
       >
         <div className="border-b border-white/10 px-6 py-7">
-          <Link
-            to="/loja"
-            className="flex items-center gap-3"
-          >
-            <span className="text-3xl text-[#e67e63]">
-              ✦
-            </span>
-
-            <div>
-              <p className="text-lg font-bold">
-                Clube
-                <span className="text-[#e67e63]">
-                  Planner
-                </span>
-              </p>
-              <p className="text-[9px] uppercase tracking-[0.2em] text-white/60">
-                Papelaria com afeto
-              </p>
-            </div>
+          <Link to="/loja" aria-label="Clube Planner — página inicial" className="block max-w-full">
+            <BrandLogo inverse className="w-full" />
           </Link>
 
           <p className="mt-8 text-[10px] font-bold uppercase tracking-[0.18em] text-[#91b8a4]">
@@ -137,7 +121,7 @@ export default function AdminLayout({
 
       <div className="min-w-0 flex-1">
         <header className="sticky top-0 z-30 flex min-h-[76px] items-center justify-between gap-4 border-b border-[#e5e1d5] bg-white px-5 shadow-sm sm:px-8">
-          <div className="flex items-center gap-4">
+          <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
             <button
               type="button"
               onClick={() => setMenuOpen(true)}
@@ -147,12 +131,12 @@ export default function AdminLayout({
               ☰
             </button>
 
-            <h1 className="font-display text-xl font-bold">
+            <h1 className="min-w-0 font-display text-base font-bold sm:text-xl">
               {titles[current] || "Administração"}
             </h1>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-3">
             <div className="hidden text-right sm:block">
               <p className="text-sm font-semibold">
                 {preview ? "Pré-visualização" : "Administrador"}
