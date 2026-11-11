@@ -1,3 +1,5 @@
+import BrandLogo from "../../components/brand/BrandLogo.jsx";
+
 import { useState } from "react";
 import {
   Link,
@@ -18,7 +20,11 @@ export default function VerificarEmail() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const { autenticado, carregando } = useAuth();
+  const {
+    autenticado,
+    carregando,
+    renovar,
+  } = useAuth();
 
   const emailInicial =
     typeof location.state?.email === "string"
@@ -30,6 +36,7 @@ export default function VerificarEmail() {
   const [enviando, setEnviando] = useState(false);
   const [reenviando, setReenviando] = useState(false);
   const [confirmado, setConfirmado] = useState(false);
+
   const [mensagem, setMensagem] = useState(
     location.state?.codigoEnviado === false
       ? "Sua conta foi criada, mas o código não pôde ser enviado. Solicite um novo código."
@@ -37,7 +44,9 @@ export default function VerificarEmail() {
         ? "Enviamos um código de verificação para seu e-mail, caso o envio tenha sido concluído."
         : ""
   );
-  const [tipoMensagem, setTipoMensagem] = useState("info");
+
+  const [tipoMensagem, setTipoMensagem] =
+    useState("info");
 
   function limparMensagem() {
     setMensagem("");
@@ -50,7 +59,8 @@ export default function VerificarEmail() {
       return;
     }
 
-    const emailNormalizado = email.trim().toLowerCase();
+    const emailNormalizado =
+      email.trim().toLowerCase();
 
     if (!emailNormalizado) {
       setTipoMensagem("error");
@@ -60,7 +70,9 @@ export default function VerificarEmail() {
 
     if (!/^\d{6}$/.test(codigo)) {
       setTipoMensagem("error");
-      setMensagem("Informe o código de seis dígitos.");
+      setMensagem(
+        "Informe o código de seis dígitos."
+      );
       return;
     }
 
@@ -68,13 +80,37 @@ export default function VerificarEmail() {
     limparMensagem();
 
     try {
-      await confirmarCodigoEmail(emailNormalizado, codigo);
+      // O backend valida o código,
+      // confirma o e-mail e cria a sessão.
+      await confirmarCodigoEmail(
+        emailNormalizado,
+        codigo
+      );
 
       setConfirmado(true);
       setCodigo("");
+
+      // Recupera a sessão criada pelo backend
+      // utilizando o cookie httpOnly.
+      try {
+        const token = await renovar();
+
+        if (token) {
+          navigate(location.state?.destino || "/perfil", {
+            replace: true,
+          });
+
+          return;
+        }
+      } catch {
+        // A verificação já foi concluída.
+        // Caso a sessão não seja recuperada,
+        // oferecemos um novo acesso por código.
+      }
+
       setTipoMensagem("success");
       setMensagem(
-        "E-mail confirmado com sucesso! Agora você pode entrar na sua conta."
+        "E-mail confirmado com sucesso! Entre na sua conta para continuar."
       );
     } catch (error) {
       setTipoMensagem("error");
@@ -93,11 +129,14 @@ export default function VerificarEmail() {
       return;
     }
 
-    const emailNormalizado = email.trim().toLowerCase();
+    const emailNormalizado =
+      email.trim().toLowerCase();
 
     if (!emailNormalizado) {
       setTipoMensagem("error");
-      setMensagem("Informe seu e-mail para solicitar outro código.");
+      setMensagem(
+        "Informe seu e-mail para solicitar outro código."
+      );
       return;
     }
 
@@ -126,7 +165,10 @@ export default function VerificarEmail() {
   if (carregando) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-sand px-5 text-slatebrand">
-        <p role="status" className="text-sm text-muted">
+        <p
+          role="status"
+          className="text-sm text-muted"
+        >
           Verificando sua sessão...
         </p>
       </main>
@@ -138,16 +180,10 @@ export default function VerificarEmail() {
   }
 
   return (
-    <main className="grid min-h-screen bg-sand text-slatebrand lg:grid-cols-[38.8889%_61.1111%]">
-      <aside className="flex flex-col bg-slatebrand px-6 py-8 text-sand sm:px-12 lg:min-h-screen lg:px-[58px]">
-        <Link
-          to="/"
-          className="inline-flex w-fit items-center gap-1 font-display text-xl font-semibold"
-        >
-          <span>Clube</span>
-          <span className="text-terracotta">
-            Planner
-          </span>
+    <main className="grid min-h-screen bg-sand text-slatebrand lg:grid-cols-[minmax(0,38.8889fr)_minmax(0,61.1111fr)]">
+      <aside className="wallpaper-blue flex min-w-0 flex-col bg-slatebrand px-6 py-8 text-sand sm:px-12 lg:min-h-screen lg:px-[58px]">
+        <Link to="/" aria-label="Clube Planner — voltar ao login" className="inline-block w-fit max-w-full">
+          <BrandLogo inverse className="w-64 sm:w-72" />
         </Link>
 
         <div className="flex flex-1 flex-col justify-center py-12 lg:py-0">
@@ -191,7 +227,7 @@ export default function VerificarEmail() {
         </p>
       </aside>
 
-      <section className="flex items-center justify-center px-5 py-12 sm:px-10 lg:px-[60px]">
+      <section className="flex min-w-0 items-center justify-center px-5 py-12 sm:px-10 lg:px-[60px]">
         <div className="w-full max-w-[560px]">
           <header>
             <h2 className="font-display text-[30px] font-semibold leading-tight">
@@ -240,7 +276,11 @@ export default function VerificarEmail() {
                 placeholder="voce@email.com"
                 autoComplete="email"
                 required
-                disabled={enviando || reenviando || confirmado}
+                disabled={
+                  enviando ||
+                  reenviando ||
+                  confirmado
+                }
                 className="h-[46px] w-full rounded-[10px] border-[1.5px] border-[#b8b2a6] bg-white px-3 text-sm text-slatebrand outline-offset-2 focus:border-sage disabled:opacity-60"
               />
             </div>
@@ -270,7 +310,11 @@ export default function VerificarEmail() {
                 }}
                 placeholder="000000"
                 required
-                disabled={enviando || reenviando || confirmado}
+                disabled={
+                  enviando ||
+                  reenviando ||
+                  confirmado
+                }
                 className="h-[54px] w-full rounded-[10px] border-[1.5px] border-[#b8b2a6] bg-white px-4 text-center text-2xl font-semibold tracking-[0.35em] text-slatebrand outline-offset-2 focus:border-sage disabled:opacity-60"
               />
             </div>
