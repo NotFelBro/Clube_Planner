@@ -217,6 +217,29 @@ const couponSnapshotSchema = new Schema({
 });
 
 const orderSchema = new Schema({
+  ambienteTeste: { type: Boolean, default: false, immutable: true },
+  pagamentoTipo: { type: String, enum: ["gratuito", "mercado_pago", null], default: null },
+  pagamentoStatus: { type: String, default: null },
+  freteSnapshot: {
+    type: new Schema({
+      cep: { type: String, required: true },
+      nivel: { type: Number, enum: [1, 2, 3], required: true },
+      valorCentavos: { type: Number, enum: [300, 600, 900], required: true },
+      distanciaKm: { type: Number, min: 0, required: true },
+      metodo: { type: String, enum: ["linha_reta_entre_ceps"], required: true },
+      origem: {
+        nome: { type: String, required: true },
+        endereco: { type: String, required: true },
+        cep: { type: String, required: true },
+      },
+    }, { _id: false }),
+    default: null,
+    immutable: true,
+  },
+  preferenceId: { type: String, default: null },
+  checkoutUrl: { type: String, default: null },
+  preferenceCriandoEm: { type: Date, default: null },
+
   userId: {
     type: Schema.Types.ObjectId,
     ref: "User",
