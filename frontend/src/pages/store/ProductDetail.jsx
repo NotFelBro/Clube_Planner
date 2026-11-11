@@ -9,26 +9,7 @@ import {
 import { useStore } from "../../components/layout/StoreContext.js";
 import {
   formatPrice,
-  getProductById,
 } from "../../data/products.js";
-
-function Heart({ filled = false }) {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill={filled ? "currentColor" : "none"}
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78Z" />
-    </svg>
-  );
-}
 
 function ProductIllustration({ product, view = 0 }) {
   return (
@@ -69,12 +50,11 @@ export default function ProductDetail() {
 
 function ProductDetailContent({ id }) {
   const navigate = useNavigate();
-  const product = getProductById(id);
+  const { products } = useStore();
+  const product = products.find((p) => p.id === Number(id));
 
   const {
     addToCart,
-    favorites,
-    toggleFavorite,
   } = useStore();
 
   const [quantity, setQuantity] = useState(1);
@@ -102,10 +82,6 @@ function ProductDetailContent({ id }) {
     );
   }
 
-  const isFavorite = favorites.some(
-    (item) => item.id === product.id
-  );
-
   function addSelectedQuantity() {
     for (let index = 0; index < quantity; index += 1) {
       addToCart(product);
@@ -129,31 +105,20 @@ function ProductDetailContent({ id }) {
     navigate("/checkout");
   }
 
-  function handleFavorite() {
-    toggleFavorite(product);
-    setMessage(
-      isFavorite
-        ? "Produto removido dos favoritos."
-        : "Produto adicionado aos favoritos."
-    );
-  }
-
   const actionButton =
     "flex min-h-12 items-center justify-center gap-2 rounded-xl border px-4 text-center text-sm font-semibold transition";
 
   return (
-    <main className="bg-sand px-4 py-8 sm:px-6">
+    <main className="px-4 py-8 sm:px-6">
       <div className="mx-auto max-w-[1320px]">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
           <nav
             aria-label="Caminho de navegação"
-            className="flex flex-wrap gap-2 text-xs text-muted"
+            className="flex flex-wrap items-center gap-3 text-xs text-muted"
           >
-            <Link to="/loja">Início</Link>
-            <span>/</span>
-            <Link to="/loja">Loja</Link>
-            <span>/</span>
-            <span className="font-semibold text-slatebrand">
+            <Link to="/loja" className="return-action">Início</Link>
+            <span aria-hidden="true">/</span>
+            <span aria-current="page" className="font-semibold text-slatebrand">
               {product.name}
             </span>
           </nav>
@@ -198,29 +163,12 @@ function ProductDetailContent({ id }) {
             </div>
           </section>
 
-          <section className="rounded-2xl bg-white p-6 sm:p-8">
+          <section className="min-w-0 rounded-2xl bg-white p-5 sm:p-8">
             <div className="flex items-start justify-between gap-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-terracotta">
                 Papelaria com afeto / {product.categoryName}
               </p>
 
-              <button
-                type="button"
-                onClick={handleFavorite}
-                aria-label={
-                  isFavorite
-                    ? "Remover dos favoritos"
-                    : "Adicionar aos favoritos"
-                }
-                aria-pressed={isFavorite}
-                className={`rounded-full bg-[#fae7de] p-3 ${
-                  isFavorite
-                    ? "text-red-600"
-                    : "text-terracotta"
-                }`}
-              >
-                <Heart filled={isFavorite} />
-              </button>
             </div>
 
             <h1 className="mt-5 font-display text-3xl font-semibold">
@@ -236,7 +184,7 @@ function ProductDetailContent({ id }) {
               className="mt-6 inline-flex items-center gap-2 text-xs text-muted hover:text-terracotta"
             >
               <span>☆☆☆☆☆</span>
-              <span>Sem avaliações • Ver feedbacks</span>
+              <span>Ver avaliações de compradores</span>
             </Link>
 
             <div className="mt-8 flex flex-wrap items-center gap-2">
@@ -264,7 +212,7 @@ function ProductDetailContent({ id }) {
             <p className="mt-6 text-sm">
               Disponibilidade:{" "}
               {product.stock == null
-                ? "consultar estoque"
+                ? "exemplar de teste"
                 : product.stock > 0
                   ? `${product.stock} unidades`
                   : "indisponível"}
@@ -331,18 +279,6 @@ function ProductDetailContent({ id }) {
                   : "Adicionar à sacola"}
               </button>
 
-              <button
-                type="button"
-                onClick={handleFavorite}
-                aria-pressed={isFavorite}
-                className={`${actionButton} border-line bg-white hover:bg-[#fff0ef] ${
-                  isFavorite ? "text-red-600" : ""
-                }`}
-              >
-                <Heart filled={isFavorite} />
-                {isFavorite ? "Favoritado" : "Favoritar"}
-              </button>
-
               <Link
                 to={`/produto/${product.id}/feedbacks`}
                 className={`${actionButton} border-line bg-white hover:bg-softsage`}
@@ -361,8 +297,8 @@ function ProductDetailContent({ id }) {
             )}
 
             <p className="mt-5 text-xs leading-6 text-muted">
-              Frete e descontos serão validados no checkout.
-              O pagamento real depende da integração com o provedor.
+              Frete calculado pelo CEP de entrega no checkout.
+              Confira o valor e confirme seu pedido no checkout.
             </p>
           </section>
         </div>
@@ -387,12 +323,12 @@ function ProductDetailContent({ id }) {
           </h3>
 
           <p className="mt-3 text-sm text-muted">
-            As avaliações reais aparecerão quando estiverem disponíveis.
+            Consulte os comentários de compradores e avalie após confirmar seu pedido.
           </p>
 
           <Link
             to={`/produto/${product.id}/feedbacks`}
-            className="mt-4 inline-block text-sm font-semibold text-terracotta hover:underline"
+            className="return-action mt-4"
           >
             Ver avaliações e enviar feedback →
           </Link>
