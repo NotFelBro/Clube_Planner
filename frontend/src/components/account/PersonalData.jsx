@@ -41,34 +41,11 @@ function formatarCPF(valor) {
   );
 }
 
-function formatarTelefone(valor) {
-  const numeros = String(valor ?? "")
-    .replace(/\D/g, "")
-    .slice(0, 11);
-
-  if (numeros.length === 11) {
-    return numeros.replace(
-      /^(\d{2})(\d{5})(\d{4})$/,
-      "($1) $2-$3"
-    );
-  }
-
-  if (numeros.length === 10) {
-    return numeros.replace(
-      /^(\d{2})(\d{4})(\d{4})$/,
-      "($1) $2-$3"
-    );
-  }
-
-  return String(valor ?? "");
-}
-
 function criarFormulario(usuario) {
   return {
     name: usuario?.nome ?? "",
     email: usuario?.email ?? "",
     cpf: formatarCPF(usuario?.cpf),
-    phone: formatarTelefone(usuario?.telefone),
   };
 }
 
@@ -135,12 +112,7 @@ export default function PersonalData() {
   const nomeAlterado =
     form.name.trim() !== (usuario?.nome ?? "").trim();
 
-  const telefoneAlterado =
-    form.phone.replace(/\D/g, "") !==
-    String(usuario?.telefone ?? "").replace(/\D/g, "");
-
-  const possuiAlteracoes =
-    nomeAlterado || telefoneAlterado;
+  const possuiAlteracoes = nomeAlterado;
 
   async function salvarAlteracoes(event) {
     event.preventDefault();
@@ -153,18 +125,10 @@ export default function PersonalData() {
     setSucesso("");
 
     const nome = form.name.trim();
-    const telefone = form.phone.replace(/\D/g, "");
 
     if (nome.length < 3 || nome.length > 120) {
       setErro(
         "O nome deve conter entre 3 e 120 caracteres."
-      );
-      return;
-    }
-
-    if (!/^\d{10,11}$/.test(telefone)) {
-      setErro(
-        "Informe um telefone válido com DDD."
       );
       return;
     }
@@ -181,7 +145,6 @@ export default function PersonalData() {
     try {
       const atualizado = await atualizarPerfil({
         nome,
-        telefone,
       });
 
       setForm(criarFormulario(atualizado));
@@ -284,26 +247,7 @@ export default function PersonalData() {
               />
             </label>
 
-            <label className="text-xs text-muted">
-              Telefone
 
-              <input
-                type="tel"
-                className={fieldClass}
-                value={form.phone}
-                onChange={(event) =>
-                  alterarCampo(
-                    "phone",
-                    event.target.value
-                  )
-                }
-                placeholder="(00) 00000-0000"
-                autoComplete="tel"
-                maxLength={20}
-                required
-                disabled={carregando || salvando}
-              />
-            </label>
           </div>
 
           <button
@@ -321,36 +265,14 @@ export default function PersonalData() {
           </button>
 
           <p className="text-xs leading-6 text-muted">
-            Você pode atualizar seu nome e telefone.
+            Você pode atualizar seu nome.
             O CPF e o e-mail permanecem protegidos
             contra alterações diretas.
           </p>
         </form>
       </Panel>
 
-      <Panel
-        title="Meus cartões"
-        description="Consulte os métodos de pagamento vinculados à sua conta."
-      >
-        <div className="rounded-xl bg-sand p-5">
-          <p className="font-semibold">
-            Nenhum cartão vinculado
-          </p>
 
-          <p className="mt-2 text-sm leading-6 text-muted">
-            Os cartões utilizados nas compras
-            aparecerão aqui somente quando o
-            provedor de pagamento disponibilizar
-            um método de pagamento salvo e autorizado.
-          </p>
-
-          <p className="mt-3 text-xs text-muted">
-            O Clube Planner não deve armazenar
-            números completos de cartões nem
-            códigos de segurança.
-          </p>
-        </div>
-      </Panel>
     </div>
   );
 }
