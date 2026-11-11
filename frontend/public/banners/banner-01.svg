@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="480" viewBox="0 0 1440 480">
+<defs><pattern id="dots" width="32" height="32" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.5" fill="#f4cbbd"/></pattern><filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#3d405b" flood-opacity=".12"/></filter></defs>
+<path fill="#fae7de" d="M0 0h1440v480H0z"/><path fill="url(#dots)" d="M0 0h1440v480H0z"/>
+<circle cx="1180" cy="230" r="260" fill="#f4cbbd"/><circle cx="1380" cy="60" r="100" fill="#fae7de"/>
+<g filter="url(#shadow)" transform="translate(840 60) rotate(-12 120 180)"><rect width="240" height="340" rx="18" fill="#81b29a"/><rect x="22" y="16" width="210" height="310" rx="10" fill="#fffdf7"/><path d="M22 18v308" stroke="#3d405b" stroke-opacity=".12" stroke-width="3"/>
+<rect x="55" y="52" width="140" height="32" rx="5" fill="#fae7de"/>
+<g stroke="#d7d5cc" stroke-width="3"><path d="M55 116h140m-140 30h140m-140 30h140m-140 30h140m-140 30h140m-140 30h100"/></g>
+<g stroke="#3d405b" stroke-width="5" stroke-linecap="round"><path d="M12 42h20M12 80h20M12 118h20M12 156h20M12 194h20M12 232h20M12 270h20M12 308h20"/></g></g>
+<g filter="url(#shadow)" transform="translate(1130 145) rotate(13 72 72)"><rect width="145" height="145" rx="4" fill="#faf1b8"/><path d="M26 42h85m-85 22h85m-85 22h65" stroke="#d0bd77" stroke-width="4"/></g>
+<g transform="translate(1300 80) rotate(17)"><rect width="18" height="270" rx="8" fill="#81b29a"/><rect y="20" width="18" height="28" fill="#3d405b"/><path d="m0 270 9 25 9-25" fill="#d7bf96"/><path d="m6 287 3 8 3-8" fill="#3d405b"/></g>
+<g transform="translate(1250 330) rotate(-12)"><rect width="100" height="56" rx="8" fill="#fffdf7"/><rect width="35" height="56" rx="8" fill="#81b29a"/></g>
+</svg>
