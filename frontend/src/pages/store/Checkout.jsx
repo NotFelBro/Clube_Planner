@@ -1,409 +1,121 @@
-
-import { useState } from "react";
+import shippingRules from "../../../../shared/shippingRules.json";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
-
 import { useStore } from "../../components/layout/StoreContext.js";
+import { useAuth } from "../../contexts/AuthContext.jsx";
+import { listarDadosConta } from "../../services/authApi.js";
+import { shopApi } from "../../services/shopApi.js";
+import AddressForm from "../../components/account/AddressForm.jsx";
 import { formatPrice } from "../../data/products.js";
-
-const inputClass =
-  "mt-2 min-h-11 w-full rounded-lg border border-line bg-white px-3 text-sm outline-offset-2 focus:border-sage";
-
-function Summary({ subtotal, count }) {
-  return (
-    <aside className="rounded-2xl border border-line bg-white p-6">
-      <h2 className="font-display text-xl font-semibold">
-        Resumo da compra
-      </h2>
-
-      <div className="mt-7 space-y-5 text-sm">
-        <div className="flex justify-between gap-4">
-          <span className="text-muted">
-            Produtos ({count})
-          </span>
-          <span>{formatPrice(subtotal)}</span>
-        </div>
-
-        <div className="flex justify-between gap-4">
-          <span className="text-muted">Descontos</span>
-          <span>A validar</span>
-        </div>
-
-        <div className="flex justify-between gap-4">
-          <span className="text-muted">Frete</span>
-          <span>A calcular</span>
-        </div>
-      </div>
-
-      <div className="mt-6 flex justify-between border-t border-line pt-5 font-display text-lg font-semibold">
-        <span>Subtotal</span>
-        <span>{formatPrice(subtotal)}</span>
-      </div>
-
-      <p className="mt-4 text-xs leading-6 text-muted">
-        Valores demonstrativos. O total definitivo
-        depende das regras de frete, descontos e estoque.
-      </p>
-    </aside>
-  );
-}
 
 export default function Checkout() {
   const navigate = useNavigate();
+  const { cart, cartSubtotal, clearCart, checkoutConfig } = useStore();
+  const { accessToken, autenticado, usuario } = useAuth();
+  const [enderecos, setEnderecos] = useState([]);
+  const [enderecoId, setEnderecoId] = useState("");
+  const [novoEndereco, setNovoEndereco] = useState(false);
+  const [carregando, setCarregando] = useState(true);
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState("");
+  const [cepNovo, setCepNovo] = useState("");
+  const [cotacao, setCotacao] = useState(null);
+  const [tentativaFrete, setTentativaFrete] = useState(0);
+  const cepEntrega = novoEndereco || !enderecoId ? cepNovo : enderecos.find((item) => item._id === enderecoId)?.cep || "";
+  const cepValido = /^\d{8}$/.test(cepEntrega);
+  const cotacaoAtual = cepValido && cotacao?.cep === cepEntrega ? cotacao : null;
+  const frete = cotacaoAtual?.frete;
+  const calculandoFrete = cepValido && !cotacaoAtual;
+  const totalCentavos = frete ? Math.round(cartSubtotal * 100) + frete.valorCentavos : null;
 
-  const {
-    cart,
-    cartCount,
-    cartSubtotal,
-  } = useStore();
-
-  const [address, setAddress] = useState({
-    name: "",
-    cep: "",
-    street: "",
-    number: "",
-    complement: "",
-    neighborhood: "",
-    city: "",
-    state: "",
-  });
-
-  const [paymentMethod, setPaymentMethod] =
-    useState("pix");
-
-  const [message, setMessage] = useState("");
-
-  function updateAddress(field, value) {
-    setAddress((previous) => ({
-      ...previous,
-      [field]: value,
-    }));
-  }
-
-  function handleSubmit(event) {
+  useEffect(() => {
+    if (!accessToken || !cepValido) return;
+    let ativo = true;
+    shopApi("/shipping-quote", accessToken, { cep: cepEntrega })
+      .then((dados) => { if (ativo) setCotacao({ cep: cepEntrega, frete: dados.frete }); })
+      .catch((error) => { if (ativo) setCotacao({ cep: cepEntrega, erro: error.message }); });
+    return () => { ativo = false; };
+  }, [accessToken, cepEntrega, cepValido, tentativaFrete]);
+  useEffect(() => {
+    let ativo = true;
+    if (!accessToken) return;
+    listarDadosConta("addresses", accessToken).then((dados) => {
+      if (ativo) { setEnderecos(dados.enderecos); setEnderecoId(dados.enderecos.find((e) => e.principal)?._id || dados.enderecos[0]?._id || ""); }
+    }).catch((error) => { if (ativo) setErro(error.message); })
+      .finally(() => { if (ativo) setCarregando(false); });
+    return () => { ativo = false; };
+  }, [accessToken]);
+  const itens = [...new Set(cart.map((p) => p.id))].sort((a, b) => a - b).map((id) => ({ id, quantidade: cart.filter((p) => p.id === id).length }));
+  async function confirmar(event) {
     event.preventDefault();
-
-    setMessage(
-      "O checkout está pronto para integração, mas ainda não é possível confirmar ou cobrar pedidos. A próxima etapa é conectar o backend ao Mercado Pago."
-    );
+    if (salvando || carregando || novoEndereco || !enderecoId || !frete) return;
+    setSalvando(true); setErro("");
+    try {
+      const assinatura = JSON.stringify({ itens, enderecoId, totalCentavos, frete: frete.valorCentavos });
+      const storageKey = `clube-checkout-${usuario.id}`;
+      let tentativa;
+      try { tentativa = JSON.parse(sessionStorage.getItem(storageKey)); } catch { /* Nova tentativa. */ }
+      if (tentativa?.assinatura !== assinatura) tentativa = { assinatura, chave: crypto.randomUUID() };
+      sessionStorage.setItem(storageKey, JSON.stringify(tentativa));
+      const { pedido } = await shopApi("/checkout", accessToken, { itens, enderecoId, chave: tentativa.chave, totalEsperadoCentavos: totalCentavos, freteEsperadoCentavos: frete.valorCentavos });
+      // O pedido já está persistido. O pagamento pode ser retomado pelos detalhes.
+      clearCart(); sessionStorage.removeItem(storageKey);
+      navigate(`/perfil/pedidos/${pedido.id}`);
+    } catch (error) { setErro(error.message); }
+    finally { setSalvando(false); }
   }
-
-  if (cartCount === 0) {
-    return (
-      <main className="min-h-[65vh] bg-sand px-4 py-20 text-center">
-        <h1 className="font-display text-3xl font-semibold">
-          Sua sacola está vazia
-        </h1>
-
-        <p className="mt-4 text-sm text-muted">
-          Adicione produtos antes de iniciar o checkout.
-        </p>
-
-        <Link
-          to="/loja"
-          className="mt-7 inline-flex rounded-xl bg-terracotta px-7 py-3 text-sm font-semibold text-white"
-        >
-          Explorar produtos
-        </Link>
-      </main>
-    );
-  }
-
-  const grouped = new Map();
-
-  for (const product of cart) {
-    const existing = grouped.get(product.id);
-
-    if (existing) {
-      existing.quantity += 1;
-    } else {
-      grouped.set(product.id, {
-        product,
-        quantity: 1,
-      });
-    }
-  }
-
-  const items = [...grouped.values()];
-
-  return (
-    <main className="min-h-[70vh] bg-sand px-4 py-10 sm:px-6">
-      <div className="mx-auto max-w-[1320px]">
-        <nav className="mb-8 flex gap-2 text-xs text-muted">
-          <Link to="/sacola">Sacola</Link>
-          <span>/</span>
-          <span>Checkout</span>
-        </nav>
-
-        <h1 className="font-display text-3xl font-semibold">
-          Finalizar compra
-        </h1>
-
-        <p className="mt-2 text-sm text-muted">
-          Revise seus produtos, endereço e forma de pagamento.
-        </p>
-
-        <div className="mt-8 grid items-start gap-6 lg:grid-cols-[1.6fr_1fr]">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <section className="rounded-2xl border border-line bg-white p-6">
-              <h2 className="font-display text-xl font-semibold">
-                Endereço de entrega
-              </h2>
-
-              <p className="mt-2 text-xs text-muted">
-                Informe o endereço para a futura validação
-                do frete.
-              </p>
-
-              <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                <label className="text-sm">
-                  Nome do destinatário
-                  <input
-                    required
-                    value={address.name}
-                    onChange={(e) =>
-                      updateAddress("name", e.target.value)
-                    }
-                    className={inputClass}
-                    placeholder="Nome completo"
-                  />
-                </label>
-
-                <label className="text-sm">
-                  CEP
-                  <input
-                    required
-                    inputMode="numeric"
-                    value={address.cep}
-                    onChange={(e) =>
-                      updateAddress("cep", e.target.value)
-                    }
-                    className={inputClass}
-                    placeholder="00000-000"
-                  />
-                </label>
-
-                <label className="text-sm sm:col-span-2">
-                  Rua / Avenida
-                  <input
-                    required
-                    value={address.street}
-                    onChange={(e) =>
-                      updateAddress("street", e.target.value)
-                    }
-                    className={inputClass}
-                    placeholder="Endereço"
-                  />
-                </label>
-
-                <label className="text-sm">
-                  Número
-                  <input
-                    required
-                    value={address.number}
-                    onChange={(e) =>
-                      updateAddress("number", e.target.value)
-                    }
-                    className={inputClass}
-                    placeholder="Número"
-                  />
-                </label>
-
-                <label className="text-sm">
-                  Complemento
-                  <input
-                    value={address.complement}
-                    onChange={(e) =>
-                      updateAddress("complement", e.target.value)
-                    }
-                    className={inputClass}
-                    placeholder="Opcional"
-                  />
-                </label>
-
-                <label className="text-sm">
-                  Bairro
-                  <input
-                    required
-                    value={address.neighborhood}
-                    onChange={(e) =>
-                      updateAddress("neighborhood", e.target.value)
-                    }
-                    className={inputClass}
-                  />
-                </label>
-
-                <label className="text-sm">
-                  Cidade
-                  <input
-                    required
-                    value={address.city}
-                    onChange={(e) =>
-                      updateAddress("city", e.target.value)
-                    }
-                    className={inputClass}
-                  />
-                </label>
-
-                <label className="text-sm">
-                  Estado (UF)
-                  <input
-                    required
-                    maxLength={2}
-                    value={address.state}
-                    onChange={(e) =>
-                      updateAddress(
-                        "state",
-                        e.target.value.toUpperCase()
-                      )
-                    }
-                    className={inputClass}
-                    placeholder="SP"
-                  />
-                </label>
-              </div>
-            </section>
-
-            <section className="rounded-2xl border border-line bg-white p-6">
-              <h2 className="font-display text-xl font-semibold">
-                Produtos do pedido
-              </h2>
-
-              <div className="mt-5 divide-y divide-line">
-                {items.map(({ product, quantity }) => (
-                  <div
-                    key={product.id}
-                    className="flex items-center justify-between gap-4 py-5"
-                  >
-                    <div>
-                      <Link
-                        to={`/produto/${product.id}`}
-                        className="text-sm font-semibold hover:text-terracotta"
-                      >
-                        {product.name}
-                      </Link>
-
-                      <p className="mt-2 text-xs text-muted">
-                        {quantity}{" "}
-                        {quantity === 1 ? "unidade" : "unidades"}
-                      </p>
-                    </div>
-
-                    <span className="text-sm font-semibold">
-                      {formatPrice(product.price * quantity)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            <section className="rounded-2xl border border-line bg-white p-6">
-              <h2 className="font-display text-xl font-semibold">
-                Entrega e cupom de frete
-              </h2>
-
-              <div className="mt-5 rounded-xl bg-softsage p-4">
-                <p className="text-sm font-semibold">
-                  Entrega padrão
-                </p>
-                <p className="mt-2 text-xs leading-6 text-muted">
-                  O valor do frete e o prazo serão
-                  calculados pela integração logística.
-                </p>
-              </div>
-            </section>
-
-            <section className="rounded-2xl border border-line bg-white p-6">
-              <h2 className="font-display text-xl font-semibold">
-                Forma de pagamento
-              </h2>
-
-              <p className="mt-2 text-xs text-muted">
-                Selecione uma opção para preparar o checkout.
-              </p>
-
-              <fieldset className="mt-6 space-y-3">
-                <legend className="sr-only">
-                  Método de pagamento
-                </legend>
-
-                {[
-                  {
-                    id: "pix",
-                    name: "Pix",
-                    description: "Pagamento instantâneo",
-                  },
-                  {
-                    id: "credit",
-                    name: "Cartão de crédito",
-                    description: "Condições definidas pelo provedor",
-                  },
-                  {
-                    id: "debit",
-                    name: "Cartão de débito",
-                    description: "Pagamento à vista",
-                  },
-                ].map((method) => (
-                  <label
-                    key={method.id}
-                    className={`flex cursor-pointer flex-wrap items-center justify-between gap-3 rounded-xl border p-4 ${
-                      paymentMethod === method.id
-                        ? "border-sage bg-softsage"
-                        : "border-line"
-                    }`}
-                  >
-                    <span className="flex items-center gap-3 text-sm font-semibold">
-                      <input
-                        type="radio"
-                        name="payment"
-                        value={method.id}
-                        checked={paymentMethod === method.id}
-                        onChange={() =>
-                          setPaymentMethod(method.id)
-                        }
-                        className="accent-[#81B29A]"
-                      />
-                      {method.name}
-                    </span>
-
-                    <span className="text-xs text-muted">
-                      {method.description}
-                    </span>
-                  </label>
-                ))}
-              </fieldset>
-            </section>
-
-            <button
-              type="submit"
-              className="min-h-12 w-full rounded-xl bg-terracotta px-5 text-sm font-semibold text-white hover:brightness-95"
-            >
-              Verificar disponibilidade do pagamento
-            </button>
-
-            {message && (
-              <div
-                role="status"
-                className="rounded-xl border border-line bg-white p-5 text-sm leading-7"
-              >
-                {message}
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={() => navigate("/sacola")}
-              className="min-h-11 rounded-xl border border-line bg-white px-6 text-sm font-semibold hover:bg-softsage"
-            >
-              Voltar para a sacola
-            </button>
-          </form>
-
-          <Summary
-            subtotal={cartSubtotal}
-            count={cartCount}
-          />
-        </div>
-      </div>
-    </main>
-  );
+  return <main className="mx-auto min-h-[65vh] max-w-5xl px-5 py-10">
+    <h1 className="font-display text-3xl font-semibold">Finalizar compra</h1>
+    {!autenticado ? <div className="mt-6 rounded-xl bg-white p-6"><p>Entre na sua conta para salvar o pedido e escolher o endereço.</p><Link to="/" state={{ from: { pathname: "/checkout" } }} className="mt-4 inline-block text-terracotta underline">Acessar minha conta</Link></div> : !cart.length ? <p className="mt-6">Sua sacola está vazia. <Link to="/loja" className="text-terracotta underline">Explorar produtos</Link></p> :
+      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+        <section className="min-w-0 rounded-2xl border border-line bg-white p-4 sm:p-6">
+          <h2 className="text-xl font-semibold">Endereço de entrega</h2>
+          {carregando && <p role="status" className="mt-4">Carregando endereços...</p>}
+          <fieldset disabled={salvando} className="mt-4 space-y-3">
+            <legend className="sr-only">Escolha um endereço</legend>
+            {enderecos.map((endereco) => <label key={endereco._id} className="flex gap-3 rounded-xl border border-line p-4 text-sm">
+              <input type="radio" name="endereco" required value={endereco._id} checked={!novoEndereco && enderecoId === endereco._id} onChange={() => { setEnderecoId(endereco._id); setNovoEndereco(false); setErro(""); }} />
+              <span>{endereco.logradouro}, {endereco.numero}<br />{endereco.bairro} · {endereco.cidade}/{endereco.estado}<br />CEP {endereco.cep}</span>
+            </label>)}
+          </fieldset>
+          {!carregando && !enderecos.length && <p className="mt-4 text-sm">Cadastre um endereço para continuar.</p>}
+          {!carregando && <>
+            {enderecos.length > 0 && <button type="button" disabled={salvando} onClick={() => { setNovoEndereco(!novoEndereco); setCepNovo(""); setErro(""); }} aria-expanded={novoEndereco} className="mt-4 text-sm font-semibold text-terracotta underline disabled:opacity-60">{novoEndereco ? "Usar endereço salvo" : "Entregar em outro endereço"}</button>}
+            {(novoEndereco || !enderecos.length) && <div className="mt-5 border-t border-line pt-4">
+              <h3 className="font-semibold">Cadastrar endereço de entrega</h3>
+              <p className="mt-2 text-sm text-muted">Informe o CEP para preencher o endereço. Confira os dados e complete o número e o complemento.</p>
+              <AddressForm onCepChange={setCepNovo} disabled={salvando} submitLabel="Salvar e usar este endereço" onSaved={(lista) => {
+                const novo = lista.find((item) => !enderecos.some((anterior) => anterior._id === item._id));
+                setEnderecos(lista);
+                setEnderecoId(novo?._id || lista[lista.length - 1]?._id || "");
+                setNovoEndereco(false);
+                setErro("");
+              }} />
+            </div>}
+          </>}
+        </section>
+        <form onSubmit={confirmar} className="min-w-0 self-start rounded-2xl border border-line bg-white p-6">
+          <h2 className="text-xl font-semibold">Resumo da compra</h2>
+          <ul className="mt-4 space-y-3 text-sm">{itens.map((item) => { const p = cart.find((p) => p.id === item.id); return <li key={item.id} className="flex justify-between gap-4"><span>{p.name} × {item.quantidade}</span><span>{formatPrice(p.price * item.quantidade)}</span></li>; })}</ul>
+          <div className="mt-5 space-y-3 border-t border-line pt-4 text-sm">
+            <p className="flex justify-between gap-3"><span>Subtotal dos produtos</span><span>{formatPrice(cartSubtotal)}</span></p>
+            <p className="flex justify-between gap-3"><span>Frete{frete ? ` · Nível ${frete.nivel}` : ""}</span><span>{frete ? formatPrice(frete.valorCentavos / 100) : calculandoFrete ? "Calculando..." : "A calcular"}</span></p>
+            <p className="text-xs leading-5 text-muted">Saída: {shippingRules.origem.nome}. {frete ? `Distância aproximada: ${frete.distanciaKm.toLocaleString("pt-BR")} km em linha reta entre CEPs.` : "Informe o CEP de entrega para calcular."}</p>
+            <ul className="space-y-1 text-xs text-muted" aria-label="Faixas de frete">
+              {shippingRules.faixas.map((faixa, index) => <li key={faixa.nivel}>Nível {faixa.nivel}: {index === 0 ? `até ${faixa.limiteKm} km` : faixa.limiteKm === null ? `acima de ${shippingRules.faixas[index - 1].limiteKm} km` : `acima de ${shippingRules.faixas[index - 1].limiteKm} até ${faixa.limiteKm} km`} — {formatPrice(faixa.valorCentavos / 100)}</li>)}
+            </ul>
+            {frete && <button type="button" disabled={salvando} onClick={() => { setCotacao(null); setTentativaFrete((valor) => valor + 1); }} className="text-xs font-semibold text-terracotta underline disabled:opacity-60">Recalcular frete</button>}
+            {calculandoFrete && <p role="status">Calculando frete pelo CEP...</p>}
+            {cotacaoAtual?.erro && <div role="alert" className="rounded-lg bg-red-50 p-3 text-red-800"><p>{cotacaoAtual.erro}</p><button type="button" onClick={() => { setCotacao(null); setTentativaFrete((valor) => valor + 1); }} className="mt-2 font-semibold underline">Tentar calcular novamente</button></div>}
+          </div>
+          <p className="mt-5 border-t border-line pt-4 text-xl font-semibold">Total: {totalCentavos === null ? "A calcular" : formatPrice(totalCentavos / 100)}</p>
+          <h3 className="mt-6 font-semibold">Pagamento</h3>
+          <p className="mt-2 text-sm text-muted">Checkout Pro do Mercado Pago: o total inclui os produtos e o frete. Escolha o meio de pagamento disponível no ambiente de teste do provedor.</p>
+          {!checkoutConfig?.habilitado && <p role="alert" className="mt-4 text-sm">Checkout indisponível. Verifique a conexão com o servidor.</p>}
+          {erro && <p role="alert" className="mt-4 text-sm text-red-800">{erro}</p>}
+          <button disabled={salvando || carregando || novoEndereco || !enderecoId || !frete || !checkoutConfig?.habilitado} className="mt-6 min-h-12 w-full rounded-xl bg-terracotta px-4 font-semibold text-white disabled:opacity-60">{salvando ? "Confirmando..." : "Criar pedido e continuar para pagamento"}</button>
+        </form>
+      </div>}
+    <Link to="/sacola" className="return-action return-action-strong mt-6">← Voltar à sacola</Link>
+  </main>;
 }
