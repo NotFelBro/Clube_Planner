@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const User = require("../models/User");
 
 const CAMPOS_ENDERECO = [
+  "pais",
   "cep",
   "logradouro",
   "numero",
