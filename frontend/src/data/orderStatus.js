@@ -1,0 +1,1 @@
+export const statusPedido = { aguardando_pagamento: "Aguardando pagamento", pago: "Confirmado", em_preparacao: "Em preparação", enviado: "Em transporte", entregue: "Entregue", cancelado: "Cancelado" };
