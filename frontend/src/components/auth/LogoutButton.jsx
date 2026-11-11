@@ -52,7 +52,7 @@ export default function LogoutButton() {
         type="button"
         onClick={handleLogout}
         disabled={saindo}
-        className="inline-flex min-h-11 w-full items-center gap-4 rounded-lg px-4 py-3 text-left text-sm font-semibold text-terracotta transition hover:bg-[#fae7de] disabled:cursor-not-allowed disabled:opacity-60"
+        className="return-action w-full justify-start gap-4 text-left disabled:cursor-not-allowed disabled:opacity-60"
       >
         <span
           aria-hidden="true"
