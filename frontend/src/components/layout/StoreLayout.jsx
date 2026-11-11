@@ -1,45 +1,23 @@
+import InfoSidebar from "./InfoSidebar.jsx";
+import { siteSections } from "../../data/siteSections.js";
+import BrandLogo from "../brand/BrandLogo.jsx";
+import { products as sampleProducts } from "../../data/products.js";
+import { shopApi } from "../../services/shopApi.js";
+import { useAuth } from "../../contexts/AuthContext.jsx";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { StoreContext } from "./StoreContext.js";
-import { Link, NavLink, Outlet, useNavigate } from "react-router";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 
 const categories = [
   { label: "Planners & agendas", category: "planners" },
   { label: "Cadernos & blocos", category: "cadernos" },
-  { label: "Papelaria criativa", category: "papelaria" },
   { label: "Canetas & acessórios", category: "canetas" },
-  { label: "Organização", category: "organizacao" },
-  { label: "Novidades ✦", category: "novidades" },
 ];
 
 function categoryPath(category) {
-  if (category === "novidades") {
-    return "/novidades";
-  }
-
-  if (category === "papelaria") {
-    return "/loja?categoria=papelaria";
-  }
 
   return `/colecoes?categoria=${category}`;
-}
-
-function HeartIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.3 1.1-1.1a5.5 5.5 0 0 0-.1-8Z" />
-    </svg>
-  );
 }
 
 function UserIcon() {
@@ -114,37 +92,24 @@ function Brand() {
   return (
     <Link
       to="/loja"
-      className="flex shrink-0 items-center gap-2"
+      className="flex min-w-0 items-center"
       aria-label="Clube Planner — página inicial"
     >
-      <div
-        aria-hidden="true"
-        className="flex h-10 w-10 items-center justify-center rounded-xl bg-softsage text-2xl text-terracotta"
-      >
-        ✦
-      </div>
-
-      <div className="flex flex-col">
-        <span className="font-display text-lg font-semibold leading-tight">
-          Clube
-          <span className="text-terracotta">Planner</span>
-        </span>
-
-        <span className="text-[8px] uppercase tracking-[0.18em] text-muted">
-          Papelaria com afeto
-        </span>
-      </div>
+      <BrandLogo className="w-40 sm:w-52" />
     </Link>
   );
 }
 
 function Header({
   cartCount,
-  favoritesCount,
   search,
   setSearch,
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const location = useLocation();
+  const activeCategory = ["/loja", "/colecoes"].includes(location.pathname)
+    ? new URLSearchParams(location.search).get("categoria")
+    : null;
   const navigate = useNavigate();
 
   function handleSearchSubmit(event) {
@@ -165,18 +130,17 @@ function Header({
   return (
     <>
       <div className="bg-slatebrand px-4 py-3 text-center text-xs text-white">
-        Frete especial em compras selecionadas • Sua rotina merece leveza
+        Frete a partir de R$ 3,00 • Calculado pelo CEP de entrega
       </div>
 
-      <div className="sticky top-0 z-50 w-full shadow-sm">
-        <header className="border-b border-line bg-sand">
-          <div className="mx-auto flex max-w-[1320px] flex-wrap items-center justify-between gap-5 px-4 py-5 sm:px-6 lg:flex-nowrap">
+        <header className="sticky top-0 z-50 w-full shrink-0 border-b border-line bg-sand shadow-sm">
+          <div className="mx-auto grid max-w-[1320px] grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-3 px-4 py-4 sm:gap-x-5 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,500px)_minmax(0,1fr)]">
             <Brand />
 
             <form
               role="search"
               onSubmit={handleSearchSubmit}
-              className="order-3 flex w-full max-w-[500px] items-center rounded-xl border border-line bg-white px-4 lg:order-none"
+              className="col-span-2 row-start-2 flex w-full min-w-0 items-center rounded-xl border border-line bg-white px-4 lg:col-span-1 lg:row-start-auto lg:max-w-[500px] lg:justify-self-center"
             >
               <SearchIcon />
 
@@ -194,43 +158,36 @@ function Header({
 
             <nav
               aria-label="Ações da conta"
-              className="flex flex-wrap items-center gap-4 text-sm sm:gap-6"
+              className="flex min-w-0 items-center justify-end gap-2 text-xs sm:gap-6 sm:text-sm"
             >
-              <NavLink
-                to="/favoritos"
-                className="flex items-center gap-1.5 whitespace-nowrap transition hover:text-terracotta"
-              >
-                <HeartIcon />
-                <span>Favoritos</span>
-                <CountBadge count={favoritesCount} />
-              </NavLink>
 
               <NavLink
                 to="/perfil"
-                className="flex items-center gap-1.5 whitespace-nowrap transition hover:text-terracotta"
+                className="flex min-h-11 items-center gap-1.5 whitespace-nowrap transition hover:text-terracotta"
               >
                 <UserIcon />
-                <span>Meu perfil</span>
+                <span className="hidden sm:inline">Meu perfil</span><span className="sm:hidden">Perfil</span>
               </NavLink>
 
               <NavLink
                 to="/sacola"
-                className="flex items-center gap-2 whitespace-nowrap transition hover:text-terracotta"
+                className="flex min-h-11 items-center gap-1.5 whitespace-nowrap transition hover:text-terracotta"
                 aria-label={`Sacola de compras com ${cartCount} produtos`}
               >
                 <ShoppingBagIcon />
-                <span>Sacola</span>
+                <span className="hidden sm:inline">Sacola</span>
                 <CountBadge count={cartCount} />
               </NavLink>
             </nav>
           </div>
         </header>
 
-        <div className="border-b border-line bg-white">
-          <div className="mx-auto max-w-[1320px] px-4 sm:px-6">
+        <div className="shrink-0 border-b border-line bg-white">
+          <div className="mx-auto grid max-w-[1320px] grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 px-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,500px)_minmax(0,1fr)] lg:gap-x-5">
+            <InfoSidebar />
             <button
               type="button"
-              className="flex w-full items-center justify-between py-3 text-sm font-semibold lg:hidden"
+              className="flex min-h-11 w-full items-center justify-between py-3 text-sm font-semibold lg:hidden"
               aria-expanded={menuOpen}
               aria-controls="store-categories"
               onClick={() =>
@@ -249,18 +206,15 @@ function Header({
               aria-label="Categorias da loja"
               className={`${
                 menuOpen ? "flex" : "hidden"
-              } flex-col gap-1 pb-3 lg:flex lg:flex-row lg:items-center lg:justify-between lg:gap-5 lg:py-4`}
+              } col-span-2 flex-col items-center gap-1 pb-3 lg:col-span-1 lg:col-start-2 lg:flex lg:flex-row lg:justify-between lg:gap-4 lg:py-4`}
             >
               {categories.map(({ label, category }) => (
                 <Link
                   key={category}
                   to={categoryPath(category)}
                   onClick={() => setMenuOpen(false)}
-                  className={`rounded-lg px-3 py-2 text-[13px] font-medium transition hover:bg-softsage hover:text-terracotta lg:px-0 lg:py-0 lg:hover:bg-transparent ${
-                    category === "novidades"
-                      ? "text-terracotta"
-                      : ""
-                  }`}
+                  aria-current={activeCategory === category ? "page" : undefined}
+                  className="store-category rounded-lg px-3 py-2 text-[13px] font-medium"
                 >
                   {label}
                 </Link>
@@ -268,7 +222,6 @@ function Header({
             </nav>
           </div>
         </div>
-      </div>
     </>
   );
 }
@@ -278,12 +231,9 @@ function Footer() {
     <footer className="bg-slatebrand text-sand">
       <div className="mx-auto grid max-w-[1320px] gap-9 px-5 py-10 sm:grid-cols-2 lg:grid-cols-4">
         <div>
-          <h2 className="font-display text-lg font-semibold">
-            Clube
-            <span className="text-terracotta">
-              Planner
-            </span>
-          </h2>
+          <Link to="/loja" aria-label="Clube Planner — página inicial" className="inline-block max-w-full">
+            <BrandLogo inverse className="w-60" />
+          </Link>
 
           <p className="mt-5 max-w-[250px] text-[13px] leading-6">
             Papelaria feita pra organizar a vida e
@@ -291,40 +241,14 @@ function Footer() {
           </p>
         </div>
 
-        <div>
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-sage">
-            Atendimento
-          </h2>
-
-          <div className="mt-4 flex flex-col gap-2 text-[13px]">
-            <span>Fale com a gente</span>
-            <span>Central de ajuda</span>
-            <span>Trocas e devoluções</span>
+        {siteSections.map((section) => (
+          <div key={section.id}>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-sage">{section.title}</h2>
+            <ul className="mt-4 flex flex-col gap-2 text-[13px]">
+              {section.items.map((item) => <li key={item}>{item}</li>)}
+            </ul>
           </div>
-        </div>
-
-        <div>
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-sage">
-            Institucional
-          </h2>
-
-          <div className="mt-4 flex flex-col gap-2 text-[13px]">
-            <span>Sobre o Clube Planner</span>
-            <span>Privacidade</span>
-            <span>Termos de uso</span>
-          </div>
-        </div>
-
-        <div>
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-sage">
-            Acompanhe
-          </h2>
-
-          <div className="mt-4 flex flex-col gap-2 text-[13px]">
-            <span>Instagram • Pinterest</span>
-            <span>Novidades e inspiração</span>
-          </div>
-        </div>
+        ))}
       </div>
 
       <div className="mx-auto flex max-w-[1320px] flex-col gap-3 border-t border-white/20 px-5 py-5 text-[11px] sm:flex-row sm:justify-between">
@@ -342,22 +266,38 @@ function Footer() {
 }
 
 export default function StoreLayout() {
-  const [cart, setCart] = useState([]);
-  const [favorites, setFavorites] = useState([]);
+  const { usuario } = useAuth();
+  return <StoreLayoutContent key={usuario?.id || "visitante"} userId={usuario?.id || "visitante"} />;
+}
+
+function StoreLayoutContent({ userId }) {
+  const storageKey = `clube-sacola-${userId}`;
+  const [cartItems, setCart] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(storageKey) || localStorage.getItem("clube-sacola-visitante") || "[]");
+      return Array.isArray(saved) ? saved.filter((p) => sampleProducts.some((s) => s.id === p?.id)).slice(0, sampleProducts.length * 99) : [];
+    } catch { return []; }
+  });
+  const [products, setProducts] = useState(sampleProducts);
+  const [checkoutConfig, setCheckoutConfig] = useState(null);
+  useEffect(() => {
+    let ativo = true;
+    shopApi("/catalog").then((dados) => {
+      if (ativo) { setProducts(dados.produtos); setCheckoutConfig(dados); }
+    }).catch(() => {});
+    return () => { ativo = false; };
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(cartItems.map((p) => ({ id: p.id }))));
+      if (userId !== "visitante") localStorage.removeItem("clube-sacola-visitante");
+    } catch { /* A compra continua disponível quando o navegador bloqueia armazenamento. */ }
+  }, [storageKey, userId, cartItems]);
+  const cart = cartItems.map((item) => products.find((p) => p.id === item.id)).filter(Boolean);
   const [search, setSearch] = useState("");
 
   function addToCart(product) {
-    setCart((previous) => [...previous, product]);
-  }
-
-  function toggleFavorite(product) {
-    setFavorites((previous) =>
-      previous.some((item) => item.id === product.id)
-        ? previous.filter(
-            (item) => item.id !== product.id
-          )
-        : [...previous, product]
-    );
+    setCart((previous) => previous.filter((p) => p.id === product.id).length >= 99 ? previous : [...previous, { id: product.id }]);
   }
 
   function removeFromCart(productId) {
@@ -406,14 +346,14 @@ export default function StoreLayout() {
   );
 
   const store = {
+    products,
+    checkoutConfig,
     cart,
     cartCount: cart.length,
     cartSubtotal,
-    favorites,
     search,
     setSearch,
     addToCart,
-    toggleFavorite,
     removeFromCart,
     updateCartQuantity,
     clearCart,
@@ -421,17 +361,16 @@ export default function StoreLayout() {
 
   return (
     <StoreContext.Provider value={store}>
-      <div className="flex min-h-screen flex-col bg-sand text-slatebrand">
+      <div className="flex min-h-screen min-w-0 flex-col bg-sand text-slatebrand">
         <Header
           cartCount={cart.length}
-          favoritesCount={favorites.length}
           search={search}
           setSearch={setSearch}
         />
 
         <main
           id="conteudo"
-          className="w-full flex-1"
+          className="wallpaper-light w-full min-w-0 flex-1"
         >
           <Outlet context={store} />
         </main>
