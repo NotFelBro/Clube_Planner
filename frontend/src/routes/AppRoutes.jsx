@@ -2,7 +2,6 @@ import {
   Navigate,
   Route,
   Routes,
-  useSearchParams,
 } from "react-router";
 
 // Layout da loja
@@ -21,7 +20,6 @@ import ShoppingCart from "../pages/store/ShoppingCart.jsx";
 import Checkout from "../pages/store/Checkout.jsx";
 import OrderDetails from "../pages/store/OrderDetails.jsx";
 import Colecoes from "../pages/store/Colecoes.jsx";
-import ComingSoon from "../pages/store/ComingSoon.jsx";
 
 // Autenticação
 import Login from "../pages/auth/Login.jsx";
@@ -29,28 +27,10 @@ import Cadastro from "../pages/auth/Cadastro.jsx";
 import VerificarEmail from "../pages/auth/VerificarEmail.jsx";
 
 // Perfil do cliente
-import MyProfile, {
-  FavoritesPage,
-} from "../pages/account/MyProfile.jsx";
+import MyProfile from "../pages/account/MyProfile.jsx";
 
 // Páginas administrativas
 import AdminSection from "../pages/admin/AdminSection.jsx";
-
-// Redirecionamento específico de Papelaria Criativa
-function CollectionsRoute() {
-  const [params] = useSearchParams();
-
-  if (params.get("categoria") === "papelaria") {
-    return (
-      <Navigate
-        to="/loja?categoria=papelaria"
-        replace
-      />
-    );
-  }
-
-  return <Colecoes />;
-}
 
 export default function AppRoutes() {
   return (
@@ -198,38 +178,7 @@ export default function AppRoutes() {
 
         <Route
           path="/colecoes"
-          element={<CollectionsRoute />}
-        />
-
-        {/* Papelaria Criativa */}
-
-        <Route
-          path="/papelaria-criativa"
-          element={
-            <Navigate
-              to="/loja?categoria=papelaria"
-              replace
-            />
-          }
-        />
-
-        {/* Organização */}
-
-        <Route
-          path="/organizacao"
-          element={
-            <Navigate
-              to="/colecoes?categoria=organizacao"
-              replace
-            />
-          }
-        />
-
-        {/* Novidades */}
-
-        <Route
-          path="/novidades"
-          element={<ComingSoon />}
+          element={<Colecoes />}
         />
 
         {/* =====================================
@@ -252,27 +201,7 @@ export default function AppRoutes() {
           />
 
           <Route
-            path="/perfil/pedidos"
-            element={<MyProfile />}
-          />
-
-          <Route
             path="/perfil/andamento"
-            element={<MyProfile />}
-          />
-
-          <Route
-            path="/perfil/enderecos"
-            element={<MyProfile />}
-          />
-
-          <Route
-            path="/perfil/dados"
-            element={<MyProfile />}
-          />
-
-          <Route
-            path="/perfil/cargo"
             element={<MyProfile />}
           />
 
@@ -293,12 +222,6 @@ export default function AppRoutes() {
             }
           />
 
-          {/* Favoritos */}
-
-          <Route
-            path="/favoritos"
-            element={<FavoritesPage />}
-          />
         </Route>
       </Route>
 
