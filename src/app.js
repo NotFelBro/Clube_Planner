@@ -32,7 +32,9 @@ app.get("/api/v1/health", (req, res) => {
   });
 });
 
+app.use("/api/v1/shop", require("./routes/storeRoutes"));
 app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/auth", require("./routes/accountDataRoutes"));
 
 app.use((req, res) => {
   return res.status(404).json({
