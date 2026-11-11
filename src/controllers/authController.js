@@ -1,10 +1,12 @@
+
 const {
   cadastrarUsuario,
-  autenticarUsuario,
   atualizarDadosPessoais,
+  AuthError,
 } = require("../services/authService");
 
 const {
+  criarSessao,
   renovarSessao,
   encerrarSessao,
   SessionError,
@@ -48,6 +50,8 @@ function usuarioPublico(usuario) {
     nome: usuario.nome,
     email: usuario.email,
     role: usuario.role,
+    emailVerificado: usuario.emailVerificado === true,
+    emailVerificadoEm: usuario.emailVerificadoEm ?? null,
   };
 }
 
@@ -88,27 +92,21 @@ async function cadastro(req, res, next) {
 
 async function login(req, res, next) {
   try {
-    const { usuario, sessao } =
-      await autenticarUsuario(req.body);
-
-    res.cookie(
-      "refreshToken",
-      sessao.refreshToken,
-      opcoesCookie(sessao.expiresAt)
-    );
-
+    const email = req.body?.email;
+    if (typeof email !== "string" || email.trim().length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      throw new AuthError("E-mail inválido.");
+    }
+    const usuario = await User.findOne({ email: email.trim().toLowerCase(), ativo: true })
+      .select("_id nome email role emailVerificado emailVerificadoEm").lean();
+    if (!usuario) throw new AuthError("E-mail não cadastrado ou conta inativa.", 401);
+    if (usuario.emailVerificado !== true) throw new AuthError("Confirme seu e-mail no cadastro antes de entrar.", 403);
+    const sessao = await criarSessao({ userId: String(usuario._id), userAgent: req.get("user-agent") });
+    res.cookie("refreshToken", sessao.refreshToken, opcoesCookie(sessao.expiresAt));
     return res.status(200).json({
       success: true,
-      message: "Login realizado com sucesso.",
-      data: {
-        usuario,
-        accessToken: sessao.accessToken,
-        expiresAt: sessao.expiresAt,
-      },
+      data: { usuario: usuarioPublico(usuario), accessToken: sessao.accessToken, expiresAt: sessao.expiresAt },
     });
-  } catch (erro) {
-    return next(erro);
-  }
+  } catch (erro) { return next(erro); }
 }
 
 async function refresh(req, res, next) {
@@ -130,7 +128,7 @@ async function refresh(req, res, next) {
       _id: sessao.userId,
       ativo: true,
     })
-      .select("_id nome email role")
+      .select("_id nome email role emailVerificado emailVerificadoEm")
       .lean();
 
     if (!usuario) {
@@ -190,7 +188,7 @@ async function me(req, res, next) {
       _id: req.auth.userId,
       ativo: true,
     })
-      .select("_id nome email cpf telefone role")
+      .select("_id nome email cpf role emailVerificado emailVerificadoEm")
       .lean();
 
     if (!usuario) {
@@ -203,7 +201,6 @@ async function me(req, res, next) {
         usuario: {
           ...usuarioPublico(usuario),
           cpf: usuario.cpf,
-          telefone: usuario.telefone,
         },
       },
     });
@@ -253,10 +250,63 @@ async function verificarEmail(req, res, next) {
       req.body?.codigo
     );
 
-    return res.status(200).json({
-      success: true,
-      message: resultado.mensagem,
-    });
+    // O código já foi validado e consumido.
+    // Somente após essa confirmação criamos a sessão.
+    const emailNormalizado =
+      req.body.email.trim().toLowerCase();
+
+    const usuario = await User.findOne({
+      email: emailNormalizado,
+      ativo: true,
+      emailVerificado: true,
+    })
+      .select("_id nome email role emailVerificado emailVerificadoEm")
+      .lean();
+
+    if (!usuario) {
+      return res.status(200).json({
+        success: true,
+        message:
+          "E-mail confirmado com sucesso. Entre na sua conta para continuar.",
+      });
+    }
+
+    try {
+      const sessao = await criarSessao({
+        userId: String(usuario._id),
+        userAgent: req.get("user-agent"),
+      });
+
+      res.cookie(
+        "refreshToken",
+        sessao.refreshToken,
+        opcoesCookie(sessao.expiresAt)
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: resultado.mensagem,
+        data: {
+          usuario: usuarioPublico(usuario),
+          accessToken: sessao.accessToken,
+          expiresAt: sessao.expiresAt,
+        },
+      });
+    } catch (erroSessao) {
+      // O e-mail permanece confirmado.
+      // Em caso de falha na sessão, o login
+      // por código continua disponível.
+      console.error(
+        "E-mail confirmado, mas falhou a criação da sessão:",
+        erroSessao.code || erroSessao.message
+      );
+
+      return res.status(200).json({
+        success: true,
+        message:
+          "E-mail confirmado com sucesso. Entre na sua conta para continuar.",
+      });
+    }
   } catch (erro) {
     return next(erro);
   }
