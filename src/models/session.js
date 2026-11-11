@@ -46,6 +46,8 @@ const sessionSchema = new mongoose.Schema(
       default: null,
     },
 
+    userAgent: { type: String, maxlength: 512, default: "" },
+
     lastUsedAt: {
       type: Date,
       default: null,
