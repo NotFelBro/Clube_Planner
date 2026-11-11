@@ -84,17 +84,8 @@ async function requisitar(
   return payload.data ?? {};
 }
 
-export async function autenticarCliente({
-  identificador,
-  senha,
-}) {
-  return requisitar("/login", {
-    method: "POST",
-    body: {
-      identificador,
-      senha,
-    },
-  });
+export function autenticarCliente(email) {
+  return requisitar("/login", { method: "POST", body: { email } });
 }
 
 export async function renovarAutenticacao() {
@@ -111,14 +102,13 @@ export async function obterMeuPerfil(accessToken) {
 
 export async function atualizarMeuPerfil(
   accessToken,
-  { nome, telefone }
+  { nome }
 ) {
   return requisitar("/me", {
     method: "PATCH",
     accessToken,
     body: {
       nome,
-      telefone,
     },
   });
 }
@@ -127,4 +117,18 @@ export async function encerrarAutenticacao() {
   return requisitar("/logout", {
     method: "POST",
   });
+}
+
+
+export function obterMinhasSessoes(accessToken) {
+  return requisitar("/sessions", { accessToken });
+}
+
+
+
+export function listarDadosConta(recurso, accessToken) {
+  return requisitar(`/${recurso}`, { accessToken });
+}
+export function salvarDadosConta(recurso, accessToken, body) {
+  return requisitar(`/${recurso}`, { method: "POST", accessToken, body });
 }
