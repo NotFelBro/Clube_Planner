@@ -60,14 +60,14 @@ describe("DM-USER-01 — Modelo User", () => {
     expect(usuario.email).toBe("cliente@example.com");
   });
 
-  it("declara índice único global para CPF", () => {
+  it("declara índice único para CPFs preenchidos", () => {
     const indice = User.schema.indexes().find(
       ([campos]) => campos.cpf === 1
     );
 
     expect(indice).toBeDefined();
     expect(indice[1].unique).toBe(true);
-    expect(indice[1].partialFilterExpression).toBeUndefined();
+    expect(indice[1].partialFilterExpression).toEqual({ cpf: { $type: "string" } });
   });
 
   it("declara índice único global para e-mail", () => {
@@ -138,7 +138,7 @@ describe("DM-USER-01 — Unicidade no MongoDB", () => {
       if (
         !indice ||
         indice.unique !== true ||
-        indice.partialFilterExpression !== undefined
+        (nome === "cpf_1" ? indice.partialFilterExpression?.cpf?.$type !== "string" : indice.partialFilterExpression !== undefined)
       ) {
         throw new Error(`Índice inválido: ${nome}`);
       }
