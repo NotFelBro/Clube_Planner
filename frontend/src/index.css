@@ -7,7 +7,7 @@
   --color-terracotta: #e07a5f;
   --color-sage: #81b29a;
   --color-slatebrand: #3d405b;
-  --color-muted: #6f707b;
+  --color-muted: #4b4d57;
   --color-line: #ddd9d1;
   --color-softsage: #e7efe9;
 
@@ -47,4 +47,224 @@ a {
 :focus-visible {
   outline: 3px solid #81b29a;
   outline-offset: 3px;
+}
+
+#root {
+  min-width: 0;
+  min-height: 100dvh;
+}
+
+/* Camadas decorativas independentes: o conteúdo permanece imóvel e clicável. */
+.wallpaper-blue,
+.wallpaper-light {
+  color: #252831;
+  position: relative;
+  isolation: isolate;
+}
+
+.wallpaper-blue {
+  overflow: hidden;
+}
+
+.wallpaper-light {
+  /* Limita a camada fixa ao conteúdo, sem cobrir o cabeçalho ou o rodapé. */
+  clip-path: inset(0);
+}
+
+.wallpaper-blue::before,
+.wallpaper-light::before {
+  content: "";
+  z-index: -1;
+  inset: -48px;
+  pointer-events: none;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  animation: wallpaper-orbit 150s linear infinite;
+  will-change: transform;
+}
+
+.wallpaper-blue::before {
+  position: absolute;
+  background-image:
+    linear-gradient(rgb(23 31 57 / 16%), rgb(23 31 57 / 16%)),
+    url('./assets/wallpapers/wallpaper-blue.png');
+}
+
+.wallpaper-light::before {
+  position: fixed;
+  background-image:
+    linear-gradient(rgb(255 250 241 / 55%), rgb(255 250 241 / 55%)),
+    url('./assets/wallpapers/wallpaper-light.png');
+}
+
+/* A órbita fecha no mesmo ponto, sem salto ou parada ao reiniciar o ciclo. */
+@keyframes wallpaper-orbit {
+  from { transform: rotate(0turn) translateX(28px) rotate(0turn); }
+  to { transform: rotate(1turn) translateX(28px) rotate(-1turn); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wallpaper-blue::before,
+  .wallpaper-light::before {
+    animation: none;
+    transform: none;
+    will-change: auto;
+  }
+}
+
+@layer components {
+  .store-category {
+    color: var(--color-slatebrand);
+    transition: background-color 180ms ease, color 180ms ease;
+  }
+
+  .store-category:hover,
+  .store-category:focus-visible,
+  .store-category[aria-current="page"] {
+    background-color: rgb(224 122 95 / 16%);
+    color: #98452f;
+  }
+
+  .product-hover,
+  .brand-hover {
+    transform-origin: center;
+    transition: transform 240ms ease-out, box-shadow 240ms ease-out;
+  }
+
+  @media (hover: hover) {
+    .product-hover:hover,
+    .product-hover:focus-within {
+      transform: scale(1.025);
+      box-shadow: 0 10px 24px rgb(37 40 49 / 12%);
+    }
+
+    .brand-hover:hover,
+    .brand-hover:focus-visible {
+      transform: scale(1.08);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .store-category,
+    .product-hover,
+    .brand-hover {
+      transition: none;
+    }
+
+    .product-hover:hover,
+    .product-hover:focus-within,
+    .brand-hover:hover,
+    .brand-hover:focus-visible {
+      transform: none;
+    }
+  }
+
+  .return-action {
+    display: inline-flex;
+    min-height: 44px;
+    max-width: 100%;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border: 1px solid rgb(224 122 95 / 40%);
+    border-radius: 10px;
+    background-color: rgb(224 122 95 / 7%);
+    color: #98452f;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.5;
+    text-align: center;
+    transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+  }
+
+  .return-action:hover:not(:disabled),
+  .return-action:focus-visible {
+    border-color: rgb(224 122 95 / 80%);
+    background-color: rgb(224 122 95 / 22%);
+    color: #793321;
+    text-decoration: none;
+  }
+
+  .return-action-strong {
+    border-color: #b65138;
+    background-color: rgb(224 122 95 / 22%);
+    color: #6e2d1d;
+  }
+
+  .return-action-strong:hover:not(:disabled),
+  .return-action-strong:focus-visible {
+    border-color: #943c26;
+    background-color: rgb(224 122 95 / 38%);
+    color: #542013;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .return-action { transition: none; }
+  }
+}
+
+/* Textos e controles respeitam a largura do contêiner em telas estreitas. */
+h1, h2, h3, p, a, button, label, li, span {
+  overflow-wrap: anywhere;
+}
+
+input, select, textarea, fieldset {
+  min-width: 0;
+}
+
+img, video {
+  max-width: 100%;
+}
+
+@media (max-width: 639px) {
+  input, select, textarea {
+    font-size: 16px;
+  }
+}
+
+#store-info-sidebar {
+  opacity: 0;
+  transform: translateX(-100%);
+  transition:
+    transform 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 280ms ease,
+    display 280ms allow-discrete,
+    overlay 280ms allow-discrete;
+}
+
+#store-info-sidebar[open] {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+#store-info-sidebar::backdrop {
+  opacity: 0;
+  transition:
+    opacity 280ms ease,
+    display 280ms allow-discrete,
+    overlay 280ms allow-discrete;
+}
+
+#store-info-sidebar[open]::backdrop {
+  opacity: 1;
+}
+
+@starting-style {
+  #store-info-sidebar[open] {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+
+  #store-info-sidebar[open]::backdrop {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #store-info-sidebar,
+  #store-info-sidebar::backdrop {
+    transition: none;
+  }
 }
