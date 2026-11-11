@@ -1,0 +1,14 @@
+{
+  "origem": {
+    "nome": "SENAI Barueri — José Ephim Mindlin",
+    "endereco": "Alameda Wagih Salles Nemer, 124 — Centro, Barueri/SP",
+    "cep": "06401134",
+    "latitude": -23.51056,
+    "longitude": -46.87611
+  },
+  "faixas": [
+    { "nivel": 1, "limiteKm": 10, "valorCentavos": 300 },
+    { "nivel": 2, "limiteKm": 30, "valorCentavos": 600 },
+    { "nivel": 3, "limiteKm": null, "valorCentavos": 900 }
+  ]
+}
