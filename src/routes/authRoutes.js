@@ -85,12 +85,14 @@ const limitarVerificacao = rateLimit({
 
 router.post(
   "/register",
+  validarOrigem,
   limitarAutenticacao,
   cadastro
 );
 
 router.post(
   "/login",
+  validarOrigem,
   limitarAutenticacao,
   login
 );
@@ -135,5 +137,8 @@ router.post(
   limitarVerificacao,
   verificarEmail
 );
+
+const { listarSessoes } = require("../controllers/accountSecurityController");
+router.get("/sessions", autenticar, listarSessoes);
 
 module.exports = router;
