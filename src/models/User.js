@@ -28,6 +28,7 @@ function validarCPF(valor) {
 
 const enderecoSchema = new mongoose.Schema(
   {
+    pais: { type: String, default: "Brasil", enum: ["Brasil"] },
     cep: {
       type: String,
       required: true,
@@ -91,28 +92,15 @@ const userSchema = new mongoose.Schema(
 
     cpf: {
       type: String,
-      required: true,
       trim: true,
       set: (valor) =>
         typeof valor === "string"
           ? valor.replace(/\D/g, "")
           : valor,
       validate: {
-        validator: validarCPF,
+        validator: (valor) => valor == null || validarCPF(valor),
         message: "CPF inválido.",
       },
-    },
-
-    telefone: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-
-    senhaHash: {
-      type: String,
-      required: true,
-      select: false,
     },
 
     role: {
@@ -186,7 +174,7 @@ userSchema.path("enderecos").validate(
   "O usuário deve possuir exatamente um endereço principal quando houver endereços cadastrados."
 );
 
-userSchema.index({ cpf: 1 }, { unique: true });
+userSchema.index({ cpf: 1 }, { unique: true, partialFilterExpression: { cpf: { $type: "string" } } });
 userSchema.index({ email: 1 }, { unique: true });
 
 module.exports =
