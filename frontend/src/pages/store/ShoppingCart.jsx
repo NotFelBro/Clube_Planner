@@ -12,8 +12,6 @@ export default function ShoppingCart() {
     cart,
     cartCount,
     cartSubtotal,
-    favorites,
-    toggleFavorite,
     updateCartQuantity,
     removeFromCart,
     clearCart,
@@ -39,12 +37,12 @@ export default function ShoppingCart() {
   }, [cart]);
 
   return (
-    <main className="min-h-[70vh] bg-sand px-4 py-10 sm:px-6">
+    <main className="min-h-[70vh] px-4 py-10 sm:px-6">
       <div className="mx-auto max-w-[1320px]">
-        <nav className="mb-7 flex gap-2 text-xs text-muted">
-          <Link to="/loja">Loja</Link>
+        <nav aria-label="Navegação da sacola" className="mb-7 flex flex-wrap items-center gap-3 text-xs text-muted">
+          <Link to="/loja" className="return-action">← Loja</Link>
           <span>/</span>
-          <span>Sacola</span>
+          <span aria-current="page">Sacola</span>
         </nav>
 
         <h1 className="font-display text-3xl font-semibold">
@@ -66,7 +64,7 @@ export default function ShoppingCart() {
             </h2>
 
             <p className="mt-3 text-sm text-muted">
-              Escolha seus produtos favoritos para começar.
+              Escolha seus produtos para começar.
             </p>
 
             <Link
@@ -77,9 +75,9 @@ export default function ShoppingCart() {
             </Link>
           </section>
         ) : (
-          <div className="mt-8 grid items-start gap-6 lg:grid-cols-[1.6fr_1fr]">
+          <div className="mt-8 grid items-start gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
             <section className="rounded-2xl border border-line bg-white p-5 sm:p-7">
-              <div className="flex items-center justify-between border-b border-line pb-5">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-5">
                 <h2 className="font-display text-xl font-semibold">
                   Produtos selecionados
                 </h2>
@@ -90,9 +88,6 @@ export default function ShoppingCart() {
               </div>
 
               {items.map(({ product, quantity }) => {
-                const favorite = favorites.some(
-                  (item) => item.id === product.id
-                );
 
                 return (
                   <article
@@ -182,18 +177,6 @@ export default function ShoppingCart() {
                         </div>
 
                         <div className="flex flex-wrap gap-4 text-sm">
-                          <button
-                            type="button"
-                            onClick={() => toggleFavorite(product)}
-                            aria-pressed={favorite}
-                            className={
-                              favorite
-                                ? "text-red-600"
-                                : "hover:text-terracotta"
-                            }
-                          >
-                            {favorite ? "♥ Favoritado" : "♡ Favoritar"}
-                          </button>
 
                           <button
                             type="button"
@@ -227,12 +210,12 @@ export default function ShoppingCart() {
 
                 <div className="flex justify-between gap-4">
                   <span className="text-muted">Frete</span>
-                  <span>A calcular</span>
+                  <span>A calcular no checkout</span>
                 </div>
 
                 <div className="flex justify-between gap-4">
                   <span className="text-muted">Descontos</span>
-                  <span>A validar</span>
+                  <span>R$ 0,00</span>
                 </div>
               </div>
 
@@ -242,8 +225,7 @@ export default function ShoppingCart() {
               </div>
 
               <p className="mt-3 text-xs leading-6 text-muted">
-                O total definitivo será calculado após a
-                validação de frete e descontos.
+                Frete calculado pelo CEP de entrega no checkout, a partir de R$ 3,00.
               </p>
 
               <button
