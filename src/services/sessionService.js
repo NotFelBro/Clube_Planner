@@ -52,7 +52,7 @@ function validarRefreshToken(refreshToken) {
   }
 }
 
-async function criarSessao({ userId }) {
+async function criarSessao({ userId, userAgent = "" }) {
   if (!mongoose.isObjectIdOrHexString(userId)) {
     throw new Error(
       "Identificador de usuário inválido."
@@ -94,6 +94,7 @@ async function criarSessao({ userId }) {
     _id: sessionId,
     userId: usuario._id,
     familyId,
+    userAgent: String(userAgent).slice(0, 512),
     refreshTokenHash,
     expiresAt,
   });
@@ -191,6 +192,8 @@ async function renovarSessao({ refreshToken }) {
             _id: novaSessionId,
             userId: usuario._id,
             familyId: sessaoAtual.familyId,
+            userAgent: sessaoAtual.userAgent,
+            lastUsedAt: agora,
             refreshTokenHash:
               novoRefreshTokenHash,
             expiresAt,
