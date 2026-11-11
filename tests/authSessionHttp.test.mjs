@@ -16,9 +16,6 @@ import request from "supertest";
 import { createRequire } from "node:module";
 import { randomUUID } from "node:crypto";
 
-import {
-  gerarCpfTeste,
-} from "./helpers/gerarCpfTeste.mjs";
 
 const require = createRequire(import.meta.url);
 
@@ -33,13 +30,13 @@ const emailService = require(
 const enviarEmailOriginal =
   emailService.enviarCodigoVerificacao;
 
+
 const BASE = "/api/v1/auth";
 
 const ORIGEM =
   process.env.FRONTEND_URL ||
   "http://localhost:5173";
 
-const SENHA = "SenhaSegura@2026!";
 
 const usuariosCriados = new Set();
 
@@ -132,13 +129,11 @@ async function criarUsuario() {
     nome: "Cliente Sessão Teste",
     email:
       `session-${randomUUID()}@example.com`,
-    cpf: gerarCpfTeste(),
-    telefone: "11999999999",
-    senha: SENHA,
   };
 
   const resposta = await request(app)
     .post(`${BASE}/register`)
+    .set("Origin", ORIGEM)
     .send(dados);
 
   if (resposta.status === 201) {
@@ -181,20 +176,11 @@ async function criarUsuario() {
   return dados;
 }
 
-async function fazerLogin(dados) {
-  const resposta = await request(app)
-    .post(`${BASE}/login`)
-    .send({
-      identificador: dados.email,
-      senha: dados.senha,
-    });
-
+async function fazerLogin(dados, userAgent = "") {
+  const resposta = await request(app).post(`${BASE}/login`)
+    .set("Origin", ORIGEM).set("User-Agent", userAgent).send({ email: dados.email });
   expect(resposta.status).toBe(200);
-
-  expect(
-    resposta.body.data.accessToken
-  ).toBeTruthy();
-
+  expect(resposta.body.data.accessToken).toBeTruthy();
   return resposta;
 }
 
@@ -260,6 +246,7 @@ afterEach(async () => {
     (id) => new mongoose.Types.ObjectId(id)
   );
 
+
   await Session.deleteMany({
     userId: { $in: ids },
   });
@@ -279,6 +266,53 @@ afterAll(async () => {
 });
 
 describe("Autenticação — Sessões HTTP", () => {
+  it("salva endereços isolados por usuário", async () => {
+    const { token } = await criarSessaoDeTeste();
+    const outra = await criarSessaoDeTeste();
+    const endereco = { pais: "Brasil", estado: "SP", cep: "01001000", cidade: "São Paulo", bairro: "Sé", logradouro: "Praça da Sé", numero: "10", complemento: "" };
+    const criado = await request(app).post(`${BASE}/addresses`).set("Origin", ORIGEM).set("Authorization", `Bearer ${token}`).send(endereco);
+    expect(criado.status).toBe(201);
+    expect(criado.body.data.enderecos[0]).toMatchObject({ ...endereco, principal: true });
+    expect((await request(app).get(`${BASE}/addresses`).set("Authorization", `Bearer ${token}`)).body.data.enderecos).toHaveLength(1);
+    expect((await request(app).get(`${BASE}/addresses`).set("Authorization", `Bearer ${outra.token}`)).body.data.enderecos).toHaveLength(0);
+
+  });
+
+  it("rejeita endereços inválidos", async () => {
+    const { token } = await criarSessaoDeTeste();
+    const resposta = await request(app).post(`${BASE}/addresses`).set("Origin", ORIGEM).set("Authorization", `Bearer ${token}`).send({ pais: "Brasil", cep: "123" });
+    expect(resposta.status).toBe(400);
+    expect((await request(app).get(`${BASE}/cards`).set("Authorization", `Bearer ${token}`)).status).toBe(404);
+    expect((await request(app).post(`${BASE}/cards`).set("Origin", ORIGEM).set("Authorization", `Bearer ${token}`).send({})).status).toBe(404);
+    expect((await request(app).get(`${BASE}/addresses`)).status).toBe(401);
+  });
+
+  it("remove as rotas de senha", async () => {
+    const { token } = await criarSessaoDeTeste();
+    for (const [method, path] of [["patch", "/password"], ["post", "/forgot-password"], ["post", "/reset-password"]]) {
+      const resposta = await request(app)[method](`${BASE}${path}`).set("Origin", ORIGEM).set("Authorization", `Bearer ${token}`).send({});
+      expect(resposta.status).toBe(404);
+    }
+  });
+
+  it("lista apenas sessões próprias, identifica aparelho e preserva identificação na renovação", async () => {
+    const dados = await criarUsuario();
+    await criarSessaoDeTeste();
+    const login = await fazerLogin(dados, "Mozilla/5.0 (Linux; Android 13; SM-S901B) Mobile");
+    const renovada = await request(app).post(`${BASE}/refresh`)
+      .set("Origin", ORIGEM).set("Cookie", obterCookie(login));
+    expect(renovada.status).toBe(200);
+    const lista = await request(app).get(`${BASE}/sessions`)
+      .set("Authorization", `Bearer ${renovada.body.data.accessToken}`);
+    expect(lista.status).toBe(200);
+    expect(lista.body.data.sessoes).toHaveLength(1);
+    expect(lista.body.data.sessoes[0]).toMatchObject({ atual: true, dispositivo: { tipo: "mobile", nome: "Celular · Samsung" } });
+    expect(lista.body.data.sessoes[0]).not.toHaveProperty("refreshTokenHash");
+    expect(renovada.body.data.usuario.emailVerificado).toBe(true);
+    const perfil = await request(app).get(`${BASE}/me`).set("Authorization", `Bearer ${renovada.body.data.accessToken}`);
+    expect(perfil.body.data.usuario.emailVerificado).toBe(true);
+  });
+
   it("renova uma sessão válida", async () => {
     const { cookie } =
       await criarSessaoDeTeste();
@@ -426,8 +460,6 @@ describe("Autenticação — Sessões HTTP", () => {
     ).toMatchObject({
       nome: dados.nome,
       email: dados.email,
-      cpf: dados.cpf,
-      telefone: dados.telefone,
       role: "client",
     });
 
