@@ -1,5 +1,8 @@
-import { useState } from "react";
+import { loginSlides } from "../../data/loginSlides.js";
+import LoginCarousel from "../../components/auth/LoginCarousel.jsx";
+import BrandLogo from "../../components/brand/BrandLogo.jsx";
 
+import { useState } from "react";
 import {
   Link,
   Navigate,
@@ -7,25 +10,8 @@ import {
   useNavigate,
 } from "react-router";
 
+
 import { useAuth } from "../../contexts/AuthContext.jsx";
-
-function PlannerIllustration() {
-  return (
-    <div
-      aria-hidden="true"
-      className="relative mx-auto h-[250px] w-[300px] max-w-full rounded-[22px] bg-[#e8f1e8]"
-    >
-      <div className="absolute left-10 top-[30px] h-[180px] w-[130px] rounded-xl bg-white shadow-sm">
-        <div className="mx-[18px] mt-5 h-[6px] rounded bg-terracotta" />
-        <div className="ml-[18px] mt-[14px] h-1 w-[70px] rounded bg-[#e6e2d4]" />
-        <div className="ml-[18px] mt-3 h-1 w-[82px] rounded bg-[#e6e2d4]" />
-        <div className="mx-[18px] mt-6 h-[60px] rounded-lg bg-[#fae7de]" />
-      </div>
-
-      <div className="absolute left-[190px] top-[60px] h-[145px] w-[65px] rounded-[10px] bg-terracotta shadow-sm" />
-    </div>
-  );
-}
 
 export default function Login() {
   const navigate = useNavigate();
@@ -63,11 +49,8 @@ export default function Login() {
       : ""
   );
 
-  const [password, setPassword] = useState("");
   const [notice, setNotice] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [emailPendente, setEmailPendente] =
-    useState(false);
 
   const emailConfirmado =
     location.state?.emailConfirmado === true;
@@ -81,35 +64,19 @@ export default function Login() {
 
     const identificador = identifier.trim();
 
-    if (!identificador || !password) {
+    if (!identificador) {
       setNotice(
-        "Informe seu e-mail ou CPF e sua senha."
+        "Informe seu e-mail cadastrado."
       );
       return;
     }
 
     setSubmitting(true);
     setNotice("");
-    setEmailPendente(false);
 
     try {
-      const usuario = await entrar(
-        identificador,
-        password
-      );
-
-      if (!usuario) {
-        setNotice(
-          "Não foi possível concluir a autenticação. Tente novamente."
-        );
-        return;
-      }
-
-      setPassword("");
-
-      navigate(destino, {
-        replace: true,
-      });
+      const usuario = await entrar(identificador);
+      if (usuario) navigate(destino, { replace: true });
     } catch (error) {
       const mensagem =
         error?.message ||
@@ -117,31 +84,10 @@ export default function Login() {
 
       setNotice(mensagem);
 
-      // O backend retorna 403 quando
-      // a conta precisa confirmar o e-mail.
-      // Verificamos também a mensagem para não
-      // confundir com outras restrições de acesso.
-      const precisaVerificarEmail =
-        error?.status === 403 &&
-        /confirme seu e-mail/i.test(mensagem);
 
-      setEmailPendente(precisaVerificarEmail);
     } finally {
       setSubmitting(false);
     }
-  }
-
-  function irParaVerificacao() {
-    const identificador = identifier.trim();
-
-    navigate("/verificar-email", {
-      state: {
-        email: identificador.includes("@")
-          ? identificador
-          : "",
-        origem: "login",
-      },
-    });
   }
 
   if (carregando) {
@@ -167,17 +113,10 @@ export default function Login() {
   }
 
   return (
-    <main className="grid min-h-screen bg-sand text-slatebrand lg:grid-cols-[43.0556%_56.9444%]">
-      <aside className="flex flex-col bg-slatebrand px-6 py-8 text-sand sm:px-12 lg:min-h-screen lg:px-16">
-        <Link
-          to="/"
-          aria-label="Clube Planner — início"
-          className="inline-flex w-fit items-center gap-2 font-display text-xl font-semibold tracking-wide"
-        >
-          CLUBE{" "}
-          <span className="text-sage">
-            PLANNER
-          </span>
+    <main className="grid min-h-screen bg-sand text-slatebrand lg:grid-cols-[minmax(0,43.0556fr)_minmax(0,56.9444fr)]">
+      <aside className="wallpaper-blue flex min-w-0 flex-col bg-slatebrand px-6 py-8 text-sand sm:px-12 lg:min-h-screen lg:px-16">
+        <Link to="/" aria-label="Clube Planner — voltar ao login" className="inline-block w-fit max-w-full">
+          <BrandLogo inverse className="w-64 sm:w-72" />
         </Link>
 
         <div className="mx-auto flex w-full max-w-[490px] flex-1 flex-col justify-center py-12 lg:py-8">
@@ -193,13 +132,11 @@ export default function Login() {
           </h1>
 
           <p className="mt-8 max-w-[450px] text-[15px] leading-7">
-            Entre para acompanhar seus pedidos,
-            salvar favoritos e organizar suas ideias.
+            Entre para acompanhar seus pedidos
+            e organizar suas ideias.
           </p>
 
-          <div className="mt-14 hidden sm:block">
-            <PlannerIllustration />
-          </div>
+          <div className="mt-8 sm:mt-12"><LoginCarousel slides={loginSlides} /></div>
         </div>
 
         <p className="text-sm font-medium">
@@ -207,7 +144,7 @@ export default function Login() {
         </p>
       </aside>
 
-      <section className="flex items-center justify-center px-5 py-12 sm:px-10 lg:px-12">
+      <section className="flex min-w-0 items-center justify-center px-5 py-12 sm:px-10 lg:px-12">
         <div className="w-full max-w-[600px]">
           <h2 className="font-display text-[30px] font-semibold">
             Acesse sua conta
@@ -218,13 +155,14 @@ export default function Login() {
             Vamos continuar?
           </p>
 
+
           {emailConfirmado && (
             <div
               role="status"
               className="mt-6 rounded-lg border border-sage bg-[#e8f1e8] p-4 text-sm text-slatebrand"
             >
               Seu e-mail foi confirmado!
-              Entre com sua senha para acessar
+              Informe seu e-mail para acessar
               sua conta.
             </div>
           )}
@@ -251,58 +189,23 @@ export default function Login() {
                 htmlFor="login-identifier"
                 className="mb-2 block text-xs font-medium text-muted"
               >
-                E-mail ou CPF
+                E-mail
               </label>
 
               <input
                 id="login-identifier"
-                type="text"
-                autoComplete="username"
+                type="email"
+                autoComplete="email"
                 value={identifier}
                 onChange={(event) => {
                   setIdentifier(event.target.value);
                   setNotice("");
-                  setEmailPendente(false);
                 }}
-                placeholder="Digite seu e-mail ou CPF"
+                placeholder="Digite seu e-mail cadastrado"
                 required
                 disabled={submitting}
                 className="h-[46px] w-full rounded-[10px] border-[1.5px] border-[#b8b2a6] bg-white px-3 text-sm text-slatebrand placeholder:text-muted disabled:cursor-not-allowed disabled:opacity-60"
               />
-            </div>
-
-            <div className="mt-3">
-              <label
-                htmlFor="login-password"
-                className="mb-2 block text-xs font-medium text-muted"
-              >
-                Senha
-              </label>
-
-              <input
-                id="login-password"
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(event) => {
-                  setPassword(event.target.value);
-                  setNotice("");
-                  setEmailPendente(false);
-                }}
-                placeholder="Digite sua senha"
-                required
-                disabled={submitting}
-                className="h-[46px] w-full rounded-[10px] border-[1.5px] border-[#b8b2a6] bg-white px-3 text-sm text-slatebrand placeholder:text-muted disabled:cursor-not-allowed disabled:opacity-60"
-              />
-            </div>
-
-            <div className="mt-2 text-right">
-              <span
-                title="Recuperação de senha disponível após a integração do backend"
-                className="text-xs font-semibold text-terracotta"
-              >
-                Esqueci minha senha
-              </span>
             </div>
 
             <button
@@ -311,7 +214,7 @@ export default function Login() {
               className="mt-6 h-[46px] w-full rounded-[11px] bg-terracotta px-4 text-sm font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {submitting
-                ? "Entrando na sua conta..."
+                ? "Entrando..."
                 : "Entrar na minha conta"}
             </button>
 
@@ -322,16 +225,6 @@ export default function Login() {
               >
                 {notice}
               </p>
-            )}
-
-            {emailPendente && (
-              <button
-                type="button"
-                onClick={irParaVerificacao}
-                className="mt-4 w-full rounded-[11px] border border-terracotta bg-white px-4 py-3 text-sm font-semibold text-terracotta transition hover:bg-[#fae7de]"
-              >
-                Confirmar meu e-mail
-              </button>
             )}
           </form>
 
