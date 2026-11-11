@@ -1,46 +1,21 @@
 
-import { useRef, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import {
   Link,
   useSearchParams,
 } from "react-router";
 
+import { stationeryBrands } from "../../data/brands.js";
 import HeroCarousel from "../../components/store/HeroCarousel.jsx";
 import { useStore } from "../../components/layout/StoreContext.js";
 import {
-  products,
   formatPrice,
 } from "../../data/products.js";
 
 const categories = [
-  {
-    id: "planners",
-    name: "Planners & agendas",
-    description: "Organize seus planos",
-    icon: "▤",
-    color: "bg-[#e8f1e8]",
-  },
-  {
-    id: "cadernos",
-    name: "Cadernos & blocos",
-    description: "Ideias que ganham vida",
-    icon: "▧",
-    color: "bg-[#e8ebf5]",
-  },
-  {
-    id: "papelaria",
-    name: "Papelaria criativa",
-    description: "Pequenos detalhes",
-    icon: "✦",
-    color: "bg-[#fae7de]",
-  },
-  {
-    id: "canetas",
-    name: "Canetas & acessórios",
-    description: "Seu kit de criação",
-    icon: "✎",
-    color: "bg-[#faf1d3]",
-  },
+  { id: "planners", name: "Planners & agendas" },
+  { id: "cadernos", name: "Cadernos & blocos" },
+  { id: "canetas", name: "Canetas & acessórios" },
 ];
 
 function PlannerIllustration({ compact = false }) {
@@ -64,60 +39,9 @@ function PlannerIllustration({ compact = false }) {
   );
 }
 
-function CategoryCard({
-  category,
-  isActive,
-  onSelect,
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onSelect(category.id)}
-      aria-pressed={isActive}
-      className={`flex min-h-[130px] w-full items-center gap-4 rounded-2xl border bg-white p-4 text-left transition hover:-translate-y-1 hover:shadow-md ${
-        isActive
-          ? "border-terracotta shadow-sm"
-          : "border-line"
-      }`}
-    >
-      <div
-        className={`flex h-[98px] w-[76px] shrink-0 items-center justify-center rounded-xl text-[29px] ${category.color}`}
-        aria-hidden="true"
-      >
-        {category.icon}
-      </div>
-
-      <div className="min-w-0">
-        <h3 className="text-sm font-semibold">
-          {category.name}
-        </h3>
-
-        <p className="mt-2 text-xs text-muted">
-          {category.description}
-        </p>
-
-        <span className="mt-5 inline-block text-xs font-semibold text-terracotta">
-          {isActive
-            ? "Selecionada ✓"
-            : "Explorar →"}
-        </span>
-      </div>
-    </button>
-  );
-}
-
 function ProductCard({ product, onAdd }) {
-  const {
-    favorites,
-    toggleFavorite,
-  } = useStore();
-
-  const isFavorite = favorites.some(
-    (item) => item.id === product.id
-  );
-
   return (
-    <article className="flex flex-col rounded-2xl border border-line bg-white p-3 transition hover:shadow-md">
+    <article className="product-hover flex flex-col rounded-2xl border border-line bg-white p-3">
       <div
         className="relative flex h-[165px] items-center justify-center rounded-xl"
         style={{
@@ -127,25 +51,6 @@ function ProductCard({ product, onAdd }) {
       >
         <PlannerIllustration compact />
 
-        <button
-          type="button"
-          onClick={() =>
-            toggleFavorite(product)
-          }
-          aria-label={
-            isFavorite
-              ? `Remover ${product.name} dos favoritos`
-              : `Adicionar ${product.name} aos favoritos`
-          }
-          aria-pressed={isFavorite}
-          className={`absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full bg-white text-xl shadow-sm transition hover:scale-110 ${
-            isFavorite
-              ? "text-red-600"
-              : "text-terracotta"
-          }`}
-        >
-          {isFavorite ? "♥" : "♡"}
-        </button>
       </div>
 
       <div className="flex flex-1 flex-col px-1 pb-1 pt-4">
@@ -200,6 +105,7 @@ function ProductCard({ product, onAdd }) {
 
 export default function Home() {
   const {
+    products,
     search,
     addToCart,
   } = useStore();
@@ -229,7 +135,7 @@ export default function Home() {
 
   const sectionTitle = selectedCategory
     ? selectedCategory.name
-    : "Favoritos da comunidade";
+    : "Produtos em destaque";
 
   const sectionDescription = selectedCategory
     ? `Explore os produtos de ${selectedCategory.name.toLowerCase()}.`
@@ -243,7 +149,6 @@ export default function Home() {
     (product) => {
       const matchesCategory =
         !activeCategory ||
-        activeCategory === "papelaria" ||
         product.category === activeCategory;
 
       const matchesSearch =
@@ -274,18 +179,6 @@ export default function Home() {
     });
   }
 
-  function handleCategorySelect(categoryId) {
-    setFeedback("");
-
-    setSearchParams({
-      categoria: categoryId,
-    });
-
-    window.requestAnimationFrame(
-      scrollToProducts
-    );
-  }
-
   function handleShowAll() {
     setFeedback("");
 
@@ -305,51 +198,10 @@ export default function Home() {
   }
 
   return (
-    <div className="bg-sand">
+    <div>
       {/* Banner principal */}
       <section className="mx-auto max-w-[1344px] px-4 pt-8 sm:px-6">
         <HeroCarousel />
-      </section>
-
-      {/* Categorias */}
-      <section className="mx-auto max-w-[1320px] px-4 pt-14 sm:px-6">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h2 className="font-display text-[26px] font-semibold">
-              Compre por categoria
-            </h2>
-
-            <p className="mt-2 text-sm text-muted">
-              Encontre o que combina com seu jeito
-              de organizar.
-            </p>
-          </div>
-
-          {activeCategory && (
-            <button
-              type="button"
-              onClick={handleShowAll}
-              className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold text-terracotta transition hover:bg-softsage"
-            >
-              Ver todos os produtos
-            </button>
-          )}
-        </div>
-
-        <div className="mt-7 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-          {categories.map((category) => (
-            <CategoryCard
-              key={category.id}
-              category={category}
-              isActive={
-                activeCategory === category.id
-              }
-              onSelect={
-                handleCategorySelect
-              }
-            />
-          ))}
-        </div>
       </section>
 
       {/* Produtos */}
@@ -364,7 +216,7 @@ export default function Home() {
               {sectionTitle}
             </h2>
 
-            <p className="mt-2 text-sm text-muted">
+            <p className="mt-2 text-sm font-medium text-[#343640]">
               {sectionDescription}
             </p>
           </div>
@@ -391,15 +243,25 @@ export default function Home() {
 
         {filteredProducts.length > 0 ? (
           <div className="mt-7 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-            {filteredProducts.map(
-              (product) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  onAdd={handleAdd}
-                />
-              )
-            )}
+            {filteredProducts.map((product, index) => (
+              <Fragment key={product.id}>
+                <ProductCard product={product} onAdd={handleAdd} />
+                {(index + 1) % 4 === 0 && index < filteredProducts.length - 1 && (
+                  <div className="col-span-full py-4 sm:py-6">
+                    <HeroCarousel
+                      compact
+                      label={`Inspirações entre produtos ${Math.floor(index / 4) + 1}`}
+                      initialSlide={(Math.floor(index / 4) + 1) % 3}
+                      title={index < 4 ? "Dê espaço às suas ideias." : "Pequenos detalhes."}
+                      subtitle={index < 4 ? "Cada página é um começo." : "Novas possibilidades."}
+                      description={index < 4
+                        ? "Do primeiro rascunho aos grandes planos, encontre companhia para criar."
+                        : "Cores, notas e ferramentas para tornar a rotina mais criativa."}
+                    />
+                  </div>
+                )}
+              </Fragment>
+            ))}
           </div>
         ) : (
           <div className="mt-7 rounded-xl border border-line bg-white p-8 text-center">
@@ -423,28 +285,19 @@ export default function Home() {
         )}
       </section>
 
-      {/* Banner inferior */}
-      <section className="mx-auto max-w-[1320px] px-4 py-10 sm:px-6">
-        <div className="flex flex-col gap-6 rounded-2xl bg-[#e8f1e8] px-7 py-6 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="font-display text-xl font-semibold">
-              Um presente para sua rotina
-            </h2>
-
-            <p className="mt-2 text-[13px] leading-6">
-              Descubra ferramentas que deixam
-              o planejamento mais leve e prazeroso.
-            </p>
-          </div>
-
-          <Link
-            to="/colecoes?categoria=organizacao"
-            className="flex min-h-[46px] shrink-0 items-center justify-center rounded-[11px] border border-line bg-white px-6 text-sm font-semibold transition hover:bg-sand"
-          >
-            Conhecer a papelaria
-          </Link>
+      <section aria-label="Marcas de papelaria" className="mx-auto max-w-[1320px] px-4 py-14 sm:px-6 sm:py-20">
+        <div className="border-y border-black/50 py-8 sm:py-10">
+          <h2 className="text-center text-sm font-semibold uppercase tracking-[0.16em] text-[#343640]">Marcas de papelaria</h2>
+          <ul className="mx-auto mt-7 grid max-w-4xl grid-cols-2 items-center justify-items-center gap-x-6 gap-y-8 sm:gap-x-10 md:grid-cols-4">
+            {stationeryBrands.map((brand) => <li key={brand.name} className="w-full min-w-0 text-center">
+              <a href={brand.url} target="_blank" rel="noopener noreferrer" aria-label={`${brand.name} — site oficial (abre em nova aba)`} className="brand-hover flex h-24 w-full items-center justify-center rounded-xl px-3 py-4 sm:px-5">
+                <img src={brand.logo} alt={brand.name} width="160" height="64" loading="lazy" decoding="async" className="h-16 w-full max-w-40 object-contain" />
+              </a>
+            </li>)}
+          </ul>
         </div>
       </section>
+
     </div>
   );
 }
