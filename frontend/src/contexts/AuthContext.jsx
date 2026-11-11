@@ -87,33 +87,15 @@ export function AuthProvider({ children }) {
     setUsuario(null);
   }, []);
 
-  const entrar = useCallback(
-    async (identificador, senha) => {
-      if (logoutPendenteRef.current) {
-        await logoutPendenteRef.current;
-      }
-
-      const geracao = ++geracaoRef.current;
-
-      const dados = await autenticarCliente({
-        identificador,
-        senha,
-      });
-
-      if (
-        geracao !== geracaoRef.current ||
-        !montadoRef.current
-      ) {
-        return null;
-      }
-
-      atualizarSessao(dados);
-      setCarregando(false);
-
-      return dados.usuario;
-    },
-    [atualizarSessao]
-  );
+  const entrar = useCallback(async (email) => {
+    if (logoutPendenteRef.current) await logoutPendenteRef.current;
+    const geracao = ++geracaoRef.current;
+    const dados = await autenticarCliente(email);
+    if (geracao !== geracaoRef.current || !montadoRef.current) return null;
+    atualizarSessao(dados);
+    setCarregando(false);
+    return dados.usuario;
+  }, [atualizarSessao]);
 
   const renovar = useCallback(async () => {
     if (logoutPendenteRef.current) {
@@ -208,7 +190,6 @@ export function AuthProvider({ children }) {
 
   const atualizarPerfil = useCallback(async ({
     nome,
-    telefone,
   }) => {
     const token = tokenRef.current;
 
@@ -223,8 +204,7 @@ export function AuthProvider({ children }) {
 
     const dados = await atualizarMeuPerfil(token, {
       nome,
-      telefone,
-    });
+      });
 
     if (
       geracao !== geracaoRef.current ||
