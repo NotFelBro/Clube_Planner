@@ -10,7 +10,7 @@ const INTERVALO_REENVIO_MS = 60 * 1000;
 const MAX_TENTATIVAS = 5;
 
 const MENSAGEM_ENVIO =
-  "Se houver uma conta pendente e elegível, enviaremos um código.";
+  "Se houver uma conta cadastrada e elegível, enviaremos um código de acesso.";
 
 class EmailVerificationError extends Error {
   constructor(message, statusCode = 400) {
@@ -154,6 +154,7 @@ async function solicitarCodigo(emailInformado) {
         email,
         ativo: true,
         emailVerificado: false,
+
         $or: [
           {
             "verificacaoEmail.ultimoEnvioEm":
@@ -228,7 +229,8 @@ async function solicitarCodigo(emailInformado) {
         {
           _id: usuarioAnterior._id,
           ativo: true,
-          emailVerificado: false,
+        emailVerificado: false,
+
           "verificacaoEmail.codigoHash":
             codigoHash,
           "verificacaoEmail.tentativas": 0,
@@ -283,7 +285,8 @@ async function confirmarCodigo(
   const usuario = await User.findOne({
     email,
     ativo: true,
-    emailVerificado: false,
+        emailVerificado: false,
+
   }).select(
     "+verificacaoEmail.codigoHash " +
     "+verificacaoEmail.expiraEm " +
@@ -338,6 +341,7 @@ async function confirmarCodigo(
         _id: usuario._id,
         ativo: true,
         emailVerificado: false,
+
         "verificacaoEmail.codigoHash":
           verificacao.codigoHash,
         "verificacaoEmail.expiraEm": {
@@ -378,6 +382,7 @@ async function confirmarCodigo(
         _id: usuario._id,
         ativo: true,
         emailVerificado: false,
+
         "verificacaoEmail.codigoHash":
           verificacao.codigoHash,
         "verificacaoEmail.expiraEm": {
