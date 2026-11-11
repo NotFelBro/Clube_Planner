@@ -1,180 +1,59 @@
-
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
-
 import { getProductById } from "../../data/products.js";
+import { useAuth } from "../../contexts/AuthContext.jsx";
+import { shopApi } from "../../services/shopApi.js";
 
 export default function ProductFeedbacks() {
   const { id } = useParams();
+  return <FeedbackContent key={id} id={id} />;
+}
+function FeedbackContent({ id }) {
   const product = getProductById(id);
-
+  const { accessToken, autenticado } = useAuth();
+  const [avaliacoes, setAvaliacoes] = useState([]);
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
   const [message, setMessage] = useState("");
-
-  if (!product) {
-    return (
-      <main className="mx-auto max-w-4xl px-5 py-16 text-center">
-        <h1 className="text-2xl font-semibold">
-          Produto não encontrado
-        </h1>
-        <Link to="/loja" className="mt-5 inline-block text-terracotta">
-          Voltar para a loja
-        </Link>
-      </main>
-    );
-  }
-
-  function handleSubmit(event) {
+  const [erro, setErro] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const [carregando, setCarregando] = useState(true);
+  useEffect(() => {
+    let ativo = true;
+    shopApi(`/products/${id}/reviews`).then((dados) => { if (ativo) setAvaliacoes(dados.avaliacoes); })
+      .catch((error) => { if (ativo) setErro(error.message); }).finally(() => { if (ativo) setCarregando(false); });
+    return () => { ativo = false; };
+  }, [id]);
+  async function enviar(event) {
     event.preventDefault();
-
-    if (rating === 0 || !comment.trim()) {
-      setMessage("Selecione uma nota e escreva seu comentário.");
-      return;
-    }
-
-    setMessage(
-      "Avaliação preenchida. A publicação estará disponível após a integração com a API e a validação da compra."
-    );
+    if (salvando) return;
+    setErro(""); setMessage("");
+    if (!rating || !comment.trim()) { setErro("Selecione uma nota e escreva seu comentário."); return; }
+    setSalvando(true);
+    try {
+      await shopApi(`/products/${id}/reviews`, accessToken, { nota: rating, comentario: comment });
+      setMessage("Avaliação salva! Você pode atualizar sua avaliação enviando novamente.");
+      const dados = await shopApi(`/products/${id}/reviews`);
+      setAvaliacoes(dados.avaliacoes); setComment(""); setRating(0);
+    } catch (error) { setErro(error.message); }
+    finally { setSalvando(false); }
   }
-
-  return (
-    <main className="min-h-[70vh] bg-sand px-4 py-10 sm:px-6">
-      <div className="mx-auto max-w-[1200px]">
-        <nav className="mb-8 flex flex-wrap gap-2 text-xs text-muted">
-          <Link to="/loja">Início</Link>
-          <span>/</span>
-          <Link to={`/produto/${product.id}`}>
-            {product.name}
-          </Link>
-          <span>/</span>
-          <span>Feedbacks</span>
-        </nav>
-
-        <h1 className="font-display text-3xl font-semibold">
-          Avaliações de {product.name}
-        </h1>
-
-        <p className="mt-2 text-sm text-muted">
-          Confira opiniões de quem comprou e compartilhe sua experiência.
-        </p>
-
-        <section className="mt-7 rounded-2xl border border-line bg-white p-7">
-          <h2 className="font-semibold">Resumo das avaliações</h2>
-
-          <div className="mt-5 flex flex-wrap items-center gap-5">
-            <span className="font-display text-4xl font-bold">
-              —
-            </span>
-
-            <div>
-              <p className="text-xl text-terracotta">
-                ☆☆☆☆☆
-              </p>
-              <p className="mt-2 text-xs text-muted">
-                Nenhuma avaliação publicada
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <div className="mt-6 grid items-start gap-6 lg:grid-cols-[1.4fr_1fr]">
-          <section className="rounded-2xl border border-line bg-white p-7">
-            <h2 className="font-display text-xl font-semibold">
-              Avaliações dos clientes
-            </h2>
-
-            <div className="mt-8 rounded-xl bg-sand p-7 text-center">
-              <p className="font-semibold">
-                Ainda não há avaliações
-              </p>
-              <p className="mt-3 text-sm leading-6 text-muted">
-                Os comentários de compradores aparecerão aqui
-                quando o sistema de avaliações estiver integrado.
-              </p>
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-line bg-white p-7">
-            <h2 className="font-display text-xl font-semibold">
-              Deixe seu feedback
-            </h2>
-
-            <p className="mt-3 text-xs text-muted">
-              Publicação sujeita à validação da compra e moderação.
-            </p>
-
-            <form onSubmit={handleSubmit} className="mt-6">
-              <fieldset>
-                <legend className="text-sm font-semibold">
-                  Sua nota
-                </legend>
-
-                <div className="mt-3 flex gap-2">
-                  {[1, 2, 3, 4, 5].map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => setRating(value)}
-                      aria-label={`${value} estrelas`}
-                      aria-pressed={rating === value}
-                      className={`text-3xl ${
-                        value <= rating
-                          ? "text-terracotta"
-                          : "text-[#b8b2a6]"
-                      }`}
-                    >
-                      {value <= rating ? "★" : "☆"}
-                    </button>
-                  ))}
-                </div>
-              </fieldset>
-
-              <label
-                htmlFor="product-comment"
-                className="mt-6 block text-sm font-semibold"
-              >
-                Seu comentário
-              </label>
-
-              <textarea
-                id="product-comment"
-                rows={6}
-                maxLength={1000}
-                value={comment}
-                onChange={(event) =>
-                  setComment(event.target.value)
-                }
-                placeholder="Conte como foi sua experiência com o produto..."
-                className="mt-2 w-full resize-y rounded-xl border border-line bg-white p-4 text-sm outline-offset-2 focus:border-sage"
-              />
-
-              <button
-                type="submit"
-                className="mt-4 min-h-12 w-full rounded-xl bg-terracotta px-5 text-sm font-semibold text-white hover:brightness-95"
-              >
-                Enviar avaliação
-              </button>
-
-              {message && (
-                <p
-                  role="status"
-                  className="mt-4 rounded-lg bg-softsage p-3 text-sm leading-6"
-                >
-                  {message}
-                </p>
-              )}
-            </form>
-          </section>
-        </div>
-
-        <Link
-          to={`/produto/${product.id}`}
-          className="mt-7 inline-flex rounded-xl border border-line bg-white px-6 py-3 text-sm font-semibold hover:bg-softsage"
-        >
-          Voltar ao produto
-        </Link>
-      </div>
-    </main>
-  );
+  if (!product) return <p className="p-10">Produto não encontrado.</p>;
+  const media = avaliacoes.length ? (avaliacoes.reduce((s, a) => s + a.nota, 0) / avaliacoes.length).toFixed(1) : "—";
+  return <main className="mx-auto min-h-[65vh] max-w-5xl px-5 py-10">
+    <Link to={`/produto/${id}`} className="return-action">← Voltar ao produto</Link>
+    <h1 className="mt-5 font-display text-3xl font-semibold">Avaliações de {product.name}</h1>
+    <p className="mt-4 text-xl">{media} / 5 · {avaliacoes.length} avaliações</p>
+    {erro && <p role="alert" className="mt-4 text-sm text-red-800">{erro}</p>}
+    <div className="mt-6 grid gap-6 lg:grid-cols-2">
+      <section className="space-y-4 rounded-2xl border border-line bg-white p-6"><h2 className="text-xl font-semibold">Opiniões dos compradores</h2>
+        {carregando && <p role="status">Carregando avaliações...</p>}
+        {!carregando && !avaliacoes.length && <p className="text-sm text-muted">Ainda não há avaliações.</p>}
+        {avaliacoes.map((a) => <article key={a._id} className="rounded-xl bg-sand p-4"><p className="font-semibold">{a.nome} · {a.nota}/5</p><p className="mt-2 whitespace-pre-wrap break-words text-sm">{a.comentario}</p><p className="mt-2 text-xs text-muted">{a.ambienteTeste ? "Compra de teste confirmada" : "Compra confirmada"} · {new Date(a.createdAt).toLocaleDateString("pt-BR")}</p></article>)}
+      </section>
+      <section className="min-w-0 rounded-2xl border border-line bg-white p-4 sm:p-6"><h2 className="text-xl font-semibold">Deixe seu feedback</h2><p className="mt-2 text-sm text-muted">Disponível após concluir a compra deste produto. Uma avaliação por conta.</p>
+        {!autenticado ? <Link to="/" state={{ from: { pathname: `/produto/${id}/feedbacks` } }} className="mt-4 inline-block text-terracotta underline">Entrar para avaliar</Link> : <form onSubmit={enviar} className="mt-5 space-y-4"><fieldset disabled={salvando}><legend className="text-sm">Sua nota</legend><div className="mt-2 flex gap-2">{[1, 2, 3, 4, 5].map((n) => <button key={n} type="button" onClick={() => setRating(n)} aria-label={`${n} estrelas`} aria-pressed={rating === n} className="text-3xl text-terracotta">{n <= rating ? "★" : "☆"}</button>)}</div><label className="mt-4 block text-sm">Comentário<textarea required maxLength={1000} rows={5} value={comment} onChange={(e) => setComment(e.target.value)} className="mt-2 w-full rounded-xl border border-line p-3" /></label></fieldset><button disabled={salvando} className="rounded-xl bg-terracotta px-5 py-3 text-sm font-semibold text-white disabled:opacity-60">{salvando ? "Salvando..." : "Enviar avaliação"}</button>{message && <p role="status" className="text-sm text-green-900">{message}</p>}</form>}
+      </section>
+    </div>
+  </main>;
 }
