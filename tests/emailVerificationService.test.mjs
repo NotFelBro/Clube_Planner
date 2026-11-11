@@ -117,7 +117,7 @@ describe("Verificação de e-mail — envio", () => {
       await servico.solicitarCodigo(EMAIL);
 
     expect(resposta.mensagem).toContain(
-      "Se houver uma conta pendente"
+      "Se houver uma conta cadastrada"
     );
 
     expect(consulta).toHaveBeenCalledOnce();
