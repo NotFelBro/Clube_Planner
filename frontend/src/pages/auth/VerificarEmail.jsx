@@ -1,30 +1,26 @@
-import BrandLogo from "../../components/brand/BrandLogo.jsx";
+import useEmailRequest from "../../components/auth/useEmailRequest.js";
 
 import { useState } from "react";
 import {
   Link,
   Navigate,
   useLocation,
-  useNavigate,
 } from "react-router";
 
+import BrandLogo from "../../components/brand/BrandLogo.jsx";
+
 import {
-  confirmarCodigoEmail,
-  solicitarCodigoEmail,
+  solicitarLinkEmail,
   CadastroApiError,
 } from "../../services/cadastroApi.js";
 
 import { useAuth } from "../../contexts/AuthContext.jsx";
 
 export default function VerificarEmail() {
-  const navigate = useNavigate();
   const location = useLocation();
+  const envioEmail = useEmailRequest();
 
-  const {
-    autenticado,
-    carregando,
-    renovar,
-  } = useAuth();
+  const { autenticado, carregando } = useAuth();
 
   const emailInicial =
     typeof location.state?.email === "string"
@@ -32,122 +28,48 @@ export default function VerificarEmail() {
       : "";
 
   const [email, setEmail] = useState(emailInicial);
-  const [codigo, setCodigo] = useState("");
-  const [enviando, setEnviando] = useState(false);
   const [reenviando, setReenviando] = useState(false);
-  const [confirmado, setConfirmado] = useState(false);
 
   const [mensagem, setMensagem] = useState(
-    location.state?.codigoEnviado === false
-      ? "Sua conta foi criada, mas o código não pôde ser enviado. Solicite um novo código."
+    location.state?.linkEnviado === false
+      ? "Sua conta foi criada, mas o link não pôde ser enviado. Solicite um novo envio."
       : emailInicial
-        ? "Enviamos um código de verificação para seu e-mail, caso o envio tenha sido concluído."
+        ? "Enviamos um link de confirmação para seu e-mail."
         : ""
   );
 
   const [tipoMensagem, setTipoMensagem] =
     useState("info");
 
-  function limparMensagem() {
-    setMensagem("");
-  }
-
-  async function handleConfirmar(event) {
+  async function handleReenviar(event) {
     event.preventDefault();
 
-    if (enviando || reenviando || confirmado) {
-      return;
-    }
+    if (reenviando) return;
 
     const emailNormalizado =
       email.trim().toLowerCase();
 
-    if (!emailNormalizado) {
+    if (
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+        emailNormalizado
+      )
+    ) {
       setTipoMensagem("error");
-      setMensagem("Informe seu e-mail.");
+      setMensagem("Informe um e-mail válido.");
       return;
     }
 
-    if (!/^\d{6}$/.test(codigo)) {
-      setTipoMensagem("error");
-      setMensagem(
-        "Informe o código de seis dígitos."
-      );
-      return;
-    }
-
-    setEnviando(true);
-    limparMensagem();
-
-    try {
-      // O backend valida o código,
-      // confirma o e-mail e cria a sessão.
-      await confirmarCodigoEmail(
-        emailNormalizado,
-        codigo
-      );
-
-      setConfirmado(true);
-      setCodigo("");
-
-      // Recupera a sessão criada pelo backend
-      // utilizando o cookie httpOnly.
-      try {
-        const token = await renovar();
-
-        if (token) {
-          navigate(location.state?.destino || "/perfil", {
-            replace: true,
-          });
-
-          return;
-        }
-      } catch {
-        // A verificação já foi concluída.
-        // Caso a sessão não seja recuperada,
-        // oferecemos um novo acesso por código.
-      }
-
-      setTipoMensagem("success");
-      setMensagem(
-        "E-mail confirmado com sucesso! Entre na sua conta para continuar."
-      );
-    } catch (error) {
-      setTipoMensagem("error");
-      setMensagem(
-        error instanceof CadastroApiError
-          ? error.message
-          : "Não foi possível confirmar seu e-mail. Tente novamente."
-      );
-    } finally {
-      setEnviando(false);
-    }
-  }
-
-  async function handleReenviar() {
-    if (enviando || reenviando || confirmado) {
-      return;
-    }
-
-    const emailNormalizado =
-      email.trim().toLowerCase();
-
-    if (!emailNormalizado) {
-      setTipoMensagem("error");
-      setMensagem(
-        "Informe seu e-mail para solicitar outro código."
-      );
-      return;
-    }
-
+    if (!envioEmail.iniciar()) return;
+    let enviado = false;
     setReenviando(true);
-    limparMensagem();
+    setMensagem("");
 
     try {
-      const resultado = await solicitarCodigoEmail(
+      const resultado = await solicitarLinkEmail(
         emailNormalizado
       );
 
+      enviado = true;
       setTipoMensagem("success");
       setMensagem(resultado.mensagem);
     } catch (error) {
@@ -155,9 +77,10 @@ export default function VerificarEmail() {
       setMensagem(
         error instanceof CadastroApiError
           ? error.message
-          : "Não foi possível solicitar outro código."
+          : "Não foi possível reenviar o link."
       );
     } finally {
+      envioEmail.concluir(enviado);
       setReenviando(false);
     }
   }
@@ -165,10 +88,7 @@ export default function VerificarEmail() {
   if (carregando) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-sand px-5 text-slatebrand">
-        <p
-          role="status"
-          className="text-sm text-muted"
-        >
+        <p role="status" className="text-sm text-muted">
           Verificando sua sessão...
         </p>
       </main>
@@ -176,13 +96,17 @@ export default function VerificarEmail() {
   }
 
   if (autenticado) {
-    return <Navigate to="/perfil" replace />;
+    return <Navigate to="/loja" replace />;
   }
 
   return (
     <main className="grid min-h-screen bg-sand text-slatebrand lg:grid-cols-[minmax(0,38.8889fr)_minmax(0,61.1111fr)]">
       <aside className="wallpaper-blue flex min-w-0 flex-col bg-slatebrand px-6 py-8 text-sand sm:px-12 lg:min-h-screen lg:px-[58px]">
-        <Link to="/" aria-label="Clube Planner — voltar ao login" className="inline-block w-fit max-w-full">
+        <Link
+          to="/"
+          aria-label="Clube Planner — voltar ao login"
+          className="inline-block w-fit max-w-full"
+        >
           <BrandLogo inverse className="w-64 sm:w-72" />
         </Link>
 
@@ -200,7 +124,7 @@ export default function VerificarEmail() {
 
           <p className="mt-6 max-w-[430px] text-[15px] leading-[1.65]">
             Confirme seu endereço de e-mail para
-            proteger sua conta e começar a aproveitar
+            ativar sua conta e começar a aproveitar
             o Clube Planner.
           </p>
 
@@ -217,7 +141,7 @@ export default function VerificarEmail() {
             </p>
 
             <p className="mt-2 text-sm">
-              Seu código é válido por 10 minutos.
+              Seu link é válido por 10 minutos.
             </p>
           </div>
         </div>
@@ -231,12 +155,13 @@ export default function VerificarEmail() {
         <div className="w-full max-w-[560px]">
           <header>
             <h2 className="font-display text-[30px] font-semibold leading-tight">
-              Confirme seu e-mail
+              Verifique seu e-mail
             </h2>
 
             <p className="mt-3 text-sm leading-6 text-muted">
-              Digite o código de seis dígitos enviado
-              para seu endereço de e-mail.
+              Enviamos uma mensagem com o botão
+              "Verificar minha conta".
+              Abra seu e-mail e siga as instruções.
             </p>
           </header>
 
@@ -253,113 +178,81 @@ export default function VerificarEmail() {
             </div>
           </div>
 
+          <div className="mt-8 rounded-[16px] border border-line bg-white p-6">
+            <p className="text-sm font-semibold">
+              Acesse sua caixa de entrada
+            </p>
+
+            <p className="mt-3 text-sm leading-6 text-muted">
+              Procure pelo e-mail enviado pelo
+              Clube Planner. Verifique também
+              a pasta de spam.
+            </p>
+
+            {emailInicial && (
+              <p className="mt-4 break-all rounded-lg bg-softsage p-3 text-center text-sm font-semibold">
+                {emailInicial}
+              </p>
+            )}
+
+            <a
+              href="https://mail.google.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-6 flex h-[46px] w-full items-center justify-center rounded-[11px] bg-terracotta px-4 text-sm font-semibold text-white transition hover:brightness-95"
+            >
+              Abrir Gmail ↗
+            </a>
+
+            <p className="mt-4 text-center text-xs leading-5 text-muted">
+              Se utiliza outro provedor de e-mail,
+              abra sua caixa de entrada normalmente.
+            </p>
+          </div>
+
           <form
-            onSubmit={handleConfirmar}
+            onSubmit={handleReenviar}
             className="mt-8"
           >
-            <div>
-              <label
-                htmlFor="verificacao-email"
-                className="mb-2 block text-xs font-medium text-muted"
-              >
-                E-mail cadastrado
-              </label>
+            <label
+              htmlFor="verificacao-email"
+              className="mb-2 block text-xs font-medium text-muted"
+            >
+              E-mail cadastrado
+            </label>
 
-              <input
-                id="verificacao-email"
-                type="email"
-                value={email}
-                onChange={(event) => {
-                  setEmail(event.target.value);
-                  limparMensagem();
-                }}
-                placeholder="voce@email.com"
-                autoComplete="email"
-                required
-                disabled={
-                  enviando ||
-                  reenviando ||
-                  confirmado
-                }
-                className="h-[46px] w-full rounded-[10px] border-[1.5px] border-[#b8b2a6] bg-white px-3 text-sm text-slatebrand outline-offset-2 focus:border-sage disabled:opacity-60"
-              />
-            </div>
-
-            <div className="mt-5">
-              <label
-                htmlFor="verificacao-codigo"
-                className="mb-2 block text-xs font-medium text-muted"
-              >
-                Código de verificação
-              </label>
-
-              <input
-                id="verificacao-codigo"
-                type="text"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                maxLength={6}
-                value={codigo}
-                onChange={(event) => {
-                  setCodigo(
-                    event.target.value
-                      .replace(/\D/g, "")
-                      .slice(0, 6)
-                  );
-                  limparMensagem();
-                }}
-                placeholder="000000"
-                required
-                disabled={
-                  enviando ||
-                  reenviando ||
-                  confirmado
-                }
-                className="h-[54px] w-full rounded-[10px] border-[1.5px] border-[#b8b2a6] bg-white px-4 text-center text-2xl font-semibold tracking-[0.35em] text-slatebrand outline-offset-2 focus:border-sage disabled:opacity-60"
-              />
-            </div>
+            <input
+              id="verificacao-email"
+              type="email"
+              value={email}
+              onChange={(event) => {
+                setEmail(event.target.value);
+                setMensagem("");
+              }}
+              placeholder="voce@email.com"
+              autoComplete="email"
+              required
+              disabled={reenviando}
+              className="h-[46px] w-full rounded-[10px] border-[1.5px] border-[#b8b2a6] bg-white px-3 text-sm text-slatebrand outline-offset-2 focus:border-sage disabled:opacity-60"
+            />
 
             <button
               type="submit"
-              disabled={
-                enviando ||
-                reenviando ||
-                confirmado ||
-                codigo.length !== 6
-              }
-              className="mt-7 flex h-[46px] w-full items-center justify-center rounded-[11px] bg-terracotta px-4 text-sm font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={reenviando || envioEmail.segundos > 0}
+              className="mt-4 flex h-[46px] w-full items-center justify-center rounded-[11px] border border-line bg-white px-4 text-sm font-semibold text-slatebrand transition hover:bg-softsage disabled:opacity-60"
             >
-              {enviando
-                ? "Confirmando..."
-                : confirmado
-                  ? "E-mail confirmado"
-                  : "Confirmar e-mail"}
+              {reenviando
+                ? "Solicitando novo link..."
+                : envioEmail.segundos > 0
+                  ? `Reenviar em ${envioEmail.segundos}s`
+                  : "Reenviar link de verificação"}
             </button>
+
+            <p className="mt-3 text-center text-xs text-muted">
+              Aguarde pelo menos 60 segundos
+              entre solicitações.
+            </p>
           </form>
-
-          {!confirmado && (
-            <div className="mt-6 text-center">
-              <p className="text-sm text-muted">
-                Não recebeu o código?
-              </p>
-
-              <button
-                type="button"
-                onClick={handleReenviar}
-                disabled={enviando || reenviando}
-                className="mt-2 text-sm font-semibold text-terracotta hover:underline disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {reenviando
-                  ? "Solicitando novo código..."
-                  : "Reenviar código"}
-              </button>
-
-              <p className="mt-2 text-xs text-muted">
-                Aguarde pelo menos 60 segundos entre
-                solicitações.
-              </p>
-            </div>
-          )}
 
           {mensagem && (
             <div
@@ -368,33 +261,14 @@ export default function VerificarEmail() {
                   ? "alert"
                   : "status"
               }
-              aria-live="polite"
               className={`mt-6 rounded-lg border p-4 text-sm ${
                 tipoMensagem === "error"
-                  ? "border-terracotta bg-[#fae7de] text-slatebrand"
-                  : "border-sage bg-[#e8f1e8] text-slatebrand"
+                  ? "border-terracotta bg-[#fae7de]"
+                  : "border-sage bg-[#e8f1e8]"
               }`}
             >
               {mensagem}
             </div>
-          )}
-
-          {confirmado && (
-            <button
-              type="button"
-              onClick={() => {
-                navigate("/", {
-                  replace: true,
-                  state: {
-                    emailConfirmado: true,
-                    email: email.trim().toLowerCase(),
-                  },
-                });
-              }}
-              className="mt-6 flex h-[46px] w-full items-center justify-center rounded-[11px] bg-terracotta px-4 text-sm font-semibold text-white"
-            >
-              Entrar na minha conta
-            </button>
           )}
 
           <div className="mt-10 text-center">
