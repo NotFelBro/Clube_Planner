@@ -848,3 +848,38 @@ it("rejeita reutilização de pedido legado sem fingerprint", async () => {
     ).toBe(0);
   });
 });
+
+describe('Expiração segura da reserva de estoque', () => {
+  const { expirarReserva } = require('../src/services/reservationExpiryService');
+  async function prepararReserva() {
+    const usuario = await criarUsuario(); const produto = await criarProduto({ estoque: 5 });
+    const itens = [itemCarrinho(produto, 2)]; await criarCarrinho(usuario, itens);
+    const pedido = await criarPedidoCheckout(parametrosCheckout(usuario, 'expiracao-' + new mongoose.Types.ObjectId(), itens));
+    return { produto, pedido };
+  }
+  it('libera apenas reservas expiradas uma vez, inclusive com duas tentativas concorrentes', async () => {
+    const { produto, pedido } = await prepararReserva();
+    expect(await expirarReserva(pedido._id)).toBe(false);
+    await Order.updateOne({ _id: pedido._id }, { $set: { 'reserva.expiresAt': new Date(Date.now() - 1000) } });
+    const resultados = await Promise.all([expirarReserva(pedido._id), expirarReserva(pedido._id)]);
+    expect(resultados.filter(Boolean)).toHaveLength(1);
+    const atualizado = await Product.findById(produto._id);
+    expect(atualizado.variacoes[0].estoqueDisponivel).toBe(5);
+    expect(atualizado.variacoes[0].estoqueReservado).toBe(0);
+    expect((await Order.findById(pedido._id)).status).toBe('cancelado');
+  });
+  it('não libera reserva de pedido pago', async () => {
+    const { produto, pedido } = await prepararReserva();
+    await Order.updateOne({ _id: pedido._id }, { $set: { status: 'pago', pagoEm: new Date(), 'reserva.status': 'consumido', 'reserva.expiresAt': new Date(0) } });
+    expect(await expirarReserva(pedido._id)).toBe(false);
+    expect((await Product.findById(produto._id)).variacoes[0].estoqueDisponivel).toBe(3);
+  });
+  it('não libera parcialmente uma reserva inconsistente', async () => {
+    const { produto, pedido } = await prepararReserva();
+    await Order.updateOne({ _id: pedido._id }, { $set: { 'reserva.expiresAt': new Date(0) } });
+    await Product.updateOne({ _id: produto._id }, { $set: { 'variacoes.0.estoqueReservado': 0 } });
+    await expect(expirarReserva(pedido._id)).rejects.toThrow('inconsistente');
+    expect((await Order.findById(pedido._id)).status).toBe('aguardando_pagamento');
+    expect((await Product.findById(produto._id)).variacoes[0].estoqueDisponivel).toBe(3);
+  });
+});
