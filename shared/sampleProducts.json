@@ -4,7 +4,7 @@
     "name": "Planner Semanal",
     "description": "Planejamento sem complicação",
     "detailDescription": "Organize seus dias com leveza e criatividade.",
-    "price": 0,
+    "price": 1,
     "discount": 0,
     "coupon": false,
     "category": "planners",
@@ -15,14 +15,50 @@
     "color": "#81B29A",
     "background": "#E8F1E8",
     "illustration": "PLANNER",
-    "illustrationSubtitle": "SEMANAL"
+    "illustrationSubtitle": "SEMANAL",
+    "image": "/products/planner-semanal.png",
+    "images": [
+      {
+        "src": "/products/planner-semanal.png",
+        "alt": "Planner Semanal — capa"
+      },
+      {
+        "src": "/products/planner-semanal/perspectiva-hd.png",
+        "alt": "Planner Semanal — capa em perspectiva"
+      },
+      {
+        "src": "/products/planner-semanal/capa-hd.png",
+        "alt": "Planner Semanal — vista da capa"
+      },
+      {
+        "src": "/products/planner-semanal/frente-verso-hd.png",
+        "alt": "Planner Semanal — capa e contracapa"
+      },
+      {
+        "src": "/products/planner-semanal/planejamento-hd.png",
+        "alt": "Planner Semanal — páginas de planejamento semanal"
+      },
+      {
+        "src": "/products/planner-semanal/espiral-hd.png",
+        "alt": "Planner Semanal — detalhe do espiral"
+      },
+      {
+        "src": "/products/planner-semanal/contracapa-hd.png",
+        "alt": "Planner Semanal — contracapa"
+      },
+      {
+        "src": "/products/planner-semanal/vista-geral-hd.png",
+        "alt": "Planner Semanal — vista geral"
+      }
+    ],
+    "shippingCouponLevel": 1
   },
   {
     "id": 2,
     "name": "Caderno Pontilhado",
     "description": "Espaço para todas as ideias",
     "detailDescription": "Um espaço especial para registrar ideias, planos e inspirações.",
-    "price": 0,
+    "price": 0.5,
     "discount": 0,
     "coupon": false,
     "category": "cadernos",
@@ -33,15 +69,46 @@
     "color": "#E7A995",
     "background": "#FAE7DE",
     "illustration": "CADERNO",
-    "illustrationSubtitle": "PONTILHADO"
+    "illustrationSubtitle": "PONTILHADO",
+    "image": "/products/caderno-pontilhado.png",
+    "images": [
+      {
+        "src": "/products/caderno-pontilhado.png",
+        "alt": "Caderno Pontilhado — capa"
+      },
+      {
+        "src": "/products/caderno-pontilhado/capa-hd.png",
+        "alt": "Caderno Pontilhado — capa em perspectiva"
+      },
+      {
+        "src": "/products/caderno-pontilhado/lateral-hd.png",
+        "alt": "Caderno Pontilhado — vista lateral"
+      },
+      {
+        "src": "/products/caderno-pontilhado/paginas-hd.png",
+        "alt": "Caderno Pontilhado — páginas pontilhadas abertas"
+      },
+      {
+        "src": "/products/caderno-pontilhado/acabamento-hd.png",
+        "alt": "Caderno Pontilhado — detalhes da capa e espiral"
+      },
+      {
+        "src": "/products/caderno-pontilhado/contracapa-hd.png",
+        "alt": "Caderno Pontilhado — contracapa"
+      },
+      {
+        "src": "/products/caderno-pontilhado/escrita-hd.png",
+        "alt": "Caderno Pontilhado — páginas pontilhadas em uso"
+      }
+    ]
   },
   {
     "id": 3,
     "name": "Kit de Canetas Pastel",
     "description": "Cor para sua rotina",
     "detailDescription": "Adicione delicadeza e criatividade às suas anotações.",
-    "price": 0,
-    "discount": 0,
+    "price": 0.9,
+    "discount": 10,
     "coupon": false,
     "category": "canetas",
     "categoryName": "Canetas & acessórios",
@@ -51,14 +118,31 @@
     "color": "#A5AECF",
     "background": "#E8EBF5",
     "illustration": "CANETAS",
-    "illustrationSubtitle": "PASTEL"
+    "illustrationSubtitle": "PASTEL",
+    "image": "/products/kit-canetas-pastel.png",
+    "images": [
+      {
+        "src": "/products/kit-canetas-pastel.png",
+        "alt": "Kit de Canetas Pastel — capa"
+      },
+      {
+        "src": "/products/kit-canetas-pastel/galeria-hd-01.png",
+        "alt": "Kit de Canetas Pastel — montagem com embalagem, canetas e amostras de escrita"
+      },
+      {
+        "src": "/products/kit-canetas-pastel/galeria-hd-02.png",
+        "alt": "Kit de Canetas Pastel — montagem com detalhes das pontas e uso no planejamento"
+      }
+    ],
+    "originalPrice": 1,
+    "shippingCouponLevel": 2
   },
   {
     "id": 4,
     "name": "Bloco de Notas",
     "description": "Pequenas listas, grandes planos",
     "detailDescription": "Registre lembretes e organize suas tarefas do dia a dia.",
-    "price": 0,
+    "price": 0.5,
     "discount": 0,
     "coupon": false,
     "category": "cadernos",
@@ -69,15 +153,46 @@
     "color": "#D7BF76",
     "background": "#FAF1D3",
     "illustration": "BLOCO",
-    "illustrationSubtitle": "DE NOTAS"
+    "illustrationSubtitle": "DE NOTAS",
+    "image": "/products/bloco-notas.png",
+    "images": [
+      {
+        "src": "/products/bloco-notas.png",
+        "alt": "Bloco de Notas — capa"
+      },
+      {
+        "src": "/products/bloco-notas/capa-hd.png",
+        "alt": "Bloco de Notas — capa Clube Planner"
+      },
+      {
+        "src": "/products/bloco-notas/perspectiva-hd.png",
+        "alt": "Bloco de Notas — bloco em perspectiva"
+      },
+      {
+        "src": "/products/bloco-notas/contracapa-hd.png",
+        "alt": "Bloco de Notas — contracapa com espiral"
+      },
+      {
+        "src": "/products/bloco-notas/pagina-hd.png",
+        "alt": "Bloco de Notas — página de notas e ideias"
+      },
+      {
+        "src": "/products/bloco-notas/acabamento-hd.png",
+        "alt": "Bloco de Notas — detalhes das páginas e espiral"
+      },
+      {
+        "src": "/products/bloco-notas/uso-hd.png",
+        "alt": "Bloco de Notas — bloco com anotações"
+      }
+    ]
   },
   {
     "id": 5,
     "name": "Agenda Permanente",
     "description": "Seus compromissos sempre à vista",
     "detailDescription": "Organize compromissos, prazos e lembretes em uma agenda sem datas predefinidas.",
-    "price": 0,
-    "discount": 0,
+    "price": 0.8,
+    "discount": 20,
     "coupon": false,
     "category": "planners",
     "categoryName": "Planners & agendas",
@@ -87,14 +202,47 @@
     "color": "#C78C77",
     "background": "#FAE7DE",
     "illustration": "AGENDA",
-    "illustrationSubtitle": "PERMANENTE"
+    "illustrationSubtitle": "PERMANENTE",
+    "image": "/products/agenda-permanente.png",
+    "images": [
+      {
+        "src": "/products/agenda-permanente.png",
+        "alt": "Agenda Permanente — capa"
+      },
+      {
+        "src": "/products/agenda-permanente/perspectiva-hd.png",
+        "alt": "Agenda Permanente — capa em perspectiva"
+      },
+      {
+        "src": "/products/agenda-permanente/capa-hd.png",
+        "alt": "Agenda Permanente — detalhes da capa"
+      },
+      {
+        "src": "/products/agenda-permanente/paginas-hd.png",
+        "alt": "Agenda Permanente — páginas de organização"
+      },
+      {
+        "src": "/products/agenda-permanente/detalhes-hd.png",
+        "alt": "Agenda Permanente — visão geral dos detalhes"
+      },
+      {
+        "src": "/products/agenda-permanente/planejamento-hd.png",
+        "alt": "Agenda Permanente — planejamento semanal em uso"
+      },
+      {
+        "src": "/products/agenda-permanente/frente-verso-hd.png",
+        "alt": "Agenda Permanente — capa e contracapa"
+      }
+    ],
+    "originalPrice": 1,
+    "shippingCouponLevel": 3
   },
   {
     "id": 6,
     "name": "Planner Mensal de Mesa",
     "description": "Veja o mês inteiro de uma só vez",
     "detailDescription": "Planeje entregas, estudos e compromissos com uma visão mensal para apoiar sobre a mesa.",
-    "price": 0,
+    "price": 0.5,
     "discount": 0,
     "coupon": false,
     "category": "planners",
@@ -105,15 +253,46 @@
     "color": "#A5AECF",
     "background": "#E8EBF5",
     "illustration": "PLANNER",
-    "illustrationSubtitle": "MENSAL"
+    "illustrationSubtitle": "MENSAL",
+    "image": "/products/planner-mensal-mesa.png",
+    "images": [
+      {
+        "src": "/products/planner-mensal-mesa.png",
+        "alt": "Planner Mensal de Mesa — capa"
+      },
+      {
+        "src": "/products/planner-mensal-mesa/capa-hd.png",
+        "alt": "Planner Mensal de Mesa — vista da capa"
+      },
+      {
+        "src": "/products/planner-mensal-mesa/lateral-hd.png",
+        "alt": "Planner Mensal de Mesa — vista lateral"
+      },
+      {
+        "src": "/products/planner-mensal-mesa/contracapa-hd.png",
+        "alt": "Planner Mensal de Mesa — contracapa"
+      },
+      {
+        "src": "/products/planner-mensal-mesa/paginas-hd.png",
+        "alt": "Planner Mensal de Mesa — páginas de planejamento mensal"
+      },
+      {
+        "src": "/products/planner-mensal-mesa/detalhes-hd.png",
+        "alt": "Planner Mensal de Mesa — detalhes do calendário e espiral"
+      },
+      {
+        "src": "/products/planner-mensal-mesa/uso-hd.png",
+        "alt": "Planner Mensal de Mesa — planejamento mensal preenchido"
+      }
+    ]
   },
   {
     "id": 7,
     "name": "Bloco de Planejamento Diário",
     "description": "Prioridades e tarefas para cada dia",
     "detailDescription": "Separe as prioridades do dia, organize horários e acompanhe sua lista de tarefas.",
-    "price": 0,
-    "discount": 0,
+    "price": 0.9,
+    "discount": 10,
     "coupon": false,
     "category": "planners",
     "categoryName": "Planners & agendas",
@@ -123,14 +302,46 @@
     "color": "#D7BF76",
     "background": "#FAF1D3",
     "illustration": "PLANOS",
-    "illustrationSubtitle": "DO DIA"
+    "illustrationSubtitle": "DO DIA",
+    "image": "/products/bloco-planejamento-diario.png",
+    "images": [
+      {
+        "src": "/products/bloco-planejamento-diario.png",
+        "alt": "Bloco de Planejamento Diário — capa"
+      },
+      {
+        "src": "/products/bloco-planejamento-diario/capa-hd.png",
+        "alt": "Bloco de Planejamento Diário — vista da capa"
+      },
+      {
+        "src": "/products/bloco-planejamento-diario/perspectiva-hd.png",
+        "alt": "Bloco de Planejamento Diário — capa em perspectiva"
+      },
+      {
+        "src": "/products/bloco-planejamento-diario/contracapa-hd.png",
+        "alt": "Bloco de Planejamento Diário — contracapa"
+      },
+      {
+        "src": "/products/bloco-planejamento-diario/paginas-hd.png",
+        "alt": "Bloco de Planejamento Diário — páginas de planejamento diário"
+      },
+      {
+        "src": "/products/bloco-planejamento-diario/detalhes-hd.png",
+        "alt": "Bloco de Planejamento Diário — detalhes de prioridades e horários"
+      },
+      {
+        "src": "/products/bloco-planejamento-diario/uso-hd.png",
+        "alt": "Bloco de Planejamento Diário — planejamento diário preenchido"
+      }
+    ],
+    "originalPrice": 1
   },
   {
     "id": 8,
     "name": "Caderno Universitário",
     "description": "Anotações para estudar e trabalhar",
     "detailDescription": "Registre o conteúdo das aulas, organize resumos e mantenha suas anotações reunidas.",
-    "price": 0,
+    "price": 0.5,
     "discount": 0,
     "coupon": false,
     "category": "cadernos",
@@ -141,14 +352,37 @@
     "color": "#81B29A",
     "background": "#E8F1E8",
     "illustration": "CADERNO",
-    "illustrationSubtitle": "UNIVERSITÁRIO"
+    "illustrationSubtitle": "UNIVERSITÁRIO",
+    "image": "/products/caderno-universitario.png",
+    "images": [
+      {
+        "src": "/products/caderno-universitario.png",
+        "alt": "Caderno Universitário — capa"
+      },
+      {
+        "src": "/products/caderno-universitario/contracapa-hd.png",
+        "alt": "Caderno Universitário — contracapa"
+      },
+      {
+        "src": "/products/caderno-universitario/paginas-hd.png",
+        "alt": "Caderno Universitário — páginas pautadas abertas"
+      },
+      {
+        "src": "/products/caderno-universitario/organizacao-hd.png",
+        "alt": "Caderno Universitário — página de planejamento diário"
+      },
+      {
+        "src": "/products/caderno-universitario/perspectiva-hd.png",
+        "alt": "Caderno Universitário — capa e acabamento em perspectiva"
+      }
+    ]
   },
   {
     "id": 9,
     "name": "Bloco de Notas Adesivas",
     "description": "Lembretes que ficam por perto",
     "detailDescription": "Marque páginas e deixe recados ou lembretes em cadernos, livros e na sua mesa.",
-    "price": 0,
+    "price": 1,
     "discount": 0,
     "coupon": false,
     "category": "cadernos",
@@ -159,15 +393,46 @@
     "color": "#B49AC4",
     "background": "#F0E8F5",
     "illustration": "NOTAS",
-    "illustrationSubtitle": "ADESIVAS"
+    "illustrationSubtitle": "ADESIVAS",
+    "image": "/products/bloco-notas-adesivas.png",
+    "images": [
+      {
+        "src": "/products/bloco-notas-adesivas.png",
+        "alt": "Bloco de Notas Adesivas — capa"
+      },
+      {
+        "src": "/products/bloco-notas-adesivas/vista-hd.png",
+        "alt": "Bloco de Notas Adesivas — bloco em perspectiva"
+      },
+      {
+        "src": "/products/bloco-notas-adesivas/folha-hd.png",
+        "alt": "Bloco de Notas Adesivas — detalhe da folha destacada"
+      },
+      {
+        "src": "/products/bloco-notas-adesivas/adesivo-hd.png",
+        "alt": "Bloco de Notas Adesivas — folha sendo destacada"
+      },
+      {
+        "src": "/products/bloco-notas-adesivas/organizacao-hd.png",
+        "alt": "Bloco de Notas Adesivas — notas adesivas na organização"
+      },
+      {
+        "src": "/products/bloco-notas-adesivas/embalagem-hd.png",
+        "alt": "Bloco de Notas Adesivas — embalagem e bloco"
+      },
+      {
+        "src": "/products/bloco-notas-adesivas/uso-hd.png",
+        "alt": "Bloco de Notas Adesivas — notas adesivas em uso"
+      }
+    ]
   },
   {
     "id": 10,
     "name": "Kit de Marca-textos",
     "description": "Destaque o que merece atenção",
     "detailDescription": "Realce trechos de livros, organize resumos por cor e encontre informações com facilidade.",
-    "price": 0,
-    "discount": 0,
+    "price": 0.4,
+    "discount": 20,
     "coupon": false,
     "category": "canetas",
     "categoryName": "Canetas & acessórios",
@@ -177,14 +442,46 @@
     "color": "#D7BF76",
     "background": "#FAF1D3",
     "illustration": "DESTAQUE",
-    "illustrationSubtitle": "EM CORES"
+    "illustrationSubtitle": "EM CORES",
+    "image": "/products/kit-marca-textos.png",
+    "images": [
+      {
+        "src": "/products/kit-marca-textos.png",
+        "alt": "Kit de Marca-textos — capa"
+      },
+      {
+        "src": "/products/kit-marca-textos/kit-hd.png",
+        "alt": "Kit de Marca-textos — kit e embalagem"
+      },
+      {
+        "src": "/products/kit-marca-textos/cores-hd.png",
+        "alt": "Kit de Marca-textos — marca-textos em cores pastel"
+      },
+      {
+        "src": "/products/kit-marca-textos/amostras-hd.png",
+        "alt": "Kit de Marca-textos — pontas e amostras de cores"
+      },
+      {
+        "src": "/products/kit-marca-textos/uso-hd.png",
+        "alt": "Kit de Marca-textos — marca-textos em uso no planejamento mensal"
+      },
+      {
+        "src": "/products/kit-marca-textos/embalagem-hd.png",
+        "alt": "Kit de Marca-textos — embalagem e detalhes do kit"
+      },
+      {
+        "src": "/products/kit-marca-textos/pontas-hd.png",
+        "alt": "Kit de Marca-textos — detalhes das pontas chanfradas"
+      }
+    ],
+    "originalPrice": 0.5
   },
   {
     "id": 11,
     "name": "Lapiseira 0,7 mm",
     "description": "Precisão para escrever e desenhar",
     "detailDescription": "Uma lapiseira para anotações, esboços e exercícios do dia a dia, compatível com grafite de 0,7 mm.",
-    "price": 0,
+    "price": 1,
     "discount": 0,
     "coupon": false,
     "category": "canetas",
@@ -195,14 +492,25 @@
     "color": "#A5AECF",
     "background": "#E8EBF5",
     "illustration": "LAPISEIRA",
-    "illustrationSubtitle": "0,7 MM"
+    "illustrationSubtitle": "0,7 MM",
+    "image": "/products/lapiseira-07mm.png",
+    "images": [
+      {
+        "src": "/products/lapiseira-07mm.png",
+        "alt": "Lapiseira 0,7 mm — capa"
+      },
+      {
+        "src": "/products/lapiseira-07mm/galeria-hd.png",
+        "alt": "Lapiseira 0,7 mm — embalagem, ponta, clipe, apoio dos dedos e uso na escrita"
+      }
+    ]
   },
   {
     "id": 12,
     "name": "Kit de Lápis e Borracha",
     "description": "O básico para suas ideias",
     "detailDescription": "Tenha lápis para escrever ou desenhar e uma borracha para corrigir e recomeçar.",
-    "price": 0,
+    "price": 0.5,
     "discount": 0,
     "coupon": false,
     "category": "canetas",
@@ -213,6 +521,37 @@
     "color": "#C78C77",
     "background": "#FAE7DE",
     "illustration": "LÁPIS",
-    "illustrationSubtitle": "E BORRACHA"
+    "illustrationSubtitle": "E BORRACHA",
+    "image": "/products/kit-lapis-borracha.png",
+    "images": [
+      {
+        "src": "/products/kit-lapis-borracha.png",
+        "alt": "Kit de Lápis e Borracha — capa"
+      },
+      {
+        "src": "/products/kit-lapis-borracha/kit-hd.png",
+        "alt": "Kit de Lápis e Borracha — kit com lápis e borracha"
+      },
+      {
+        "src": "/products/kit-lapis-borracha/lapis-hd.png",
+        "alt": "Kit de Lápis e Borracha — lápis e borrachas"
+      },
+      {
+        "src": "/products/kit-lapis-borracha/detalhes-hd.png",
+        "alt": "Kit de Lápis e Borracha — detalhes do kit"
+      },
+      {
+        "src": "/products/kit-lapis-borracha/caixa-hd.png",
+        "alt": "Kit de Lápis e Borracha — kit na caixa"
+      },
+      {
+        "src": "/products/kit-lapis-borracha/uso-hd.png",
+        "alt": "Kit de Lápis e Borracha — lápis em uso no planejamento"
+      },
+      {
+        "src": "/products/kit-lapis-borracha/embalagem-hd.png",
+        "alt": "Kit de Lápis e Borracha — embalagem do kit"
+      }
+    ]
   }
 ]
