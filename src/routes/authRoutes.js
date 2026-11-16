@@ -9,7 +9,7 @@ const {
   logout,
   me,
   atualizarMeuPerfil,
-  enviarCodigoEmail,
+  enviarLinkEmail,
   verificarEmail,
 } = require("../controllers/authController");
 
@@ -22,66 +22,49 @@ const {
 } = require("../middlewares/validarOrigem");
 
 const router = express.Router();
+const { criarLimitadorLogin } = require("../middlewares/security");
+const limitarConta = criarLimitadorLogin(process.env.NODE_ENV === "test" ? 1000 : 10);
 
-const limitarAutenticacao = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: process.env.NODE_ENV === "test" ? 1000 : 20,
-  standardHeaders: "draft-8",
-  legacyHeaders: false,
-  message: {
-    success: false,
-    message:
-      "Muitas tentativas. Tente novamente mais tarde.",
-  },
-});
+function criarLimitador(limite, mensagem) {
+  return rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit:
+      process.env.NODE_ENV === "test"
+        ? 1000
+        : limite,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    message: {
+      success: false,
+      message: mensagem,
+    },
+  });
+}
 
-const limitarRenovacao = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: process.env.NODE_ENV === "test" ? 1000 : 60,
-  standardHeaders: "draft-8",
-  legacyHeaders: false,
-  message: {
-    success: false,
-    message:
-      "Muitas tentativas de renovação. Aguarde alguns minutos.",
-  },
-});
+const limitarAutenticacao = criarLimitador(
+  20,
+  "Muitas tentativas. Tente novamente mais tarde."
+);
 
-const limitarAtualizacao = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: process.env.NODE_ENV === "test" ? 1000 : 30,
-  standardHeaders: "draft-8",
-  legacyHeaders: false,
-  message: {
-    success: false,
-    message:
-      "Muitas tentativas de atualização. Aguarde alguns minutos.",
-  },
-});
+const limitarRenovacao = criarLimitador(
+  60,
+  "Muitas tentativas de renovação. Aguarde alguns minutos."
+);
 
-const limitarEnvioCodigo = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: process.env.NODE_ENV === "test" ? 1000 : 5,
-  standardHeaders: "draft-8",
-  legacyHeaders: false,
-  message: {
-    success: false,
-    message:
-      "Muitas solicitações de código. Aguarde alguns minutos.",
-  },
-});
+const limitarAtualizacao = criarLimitador(
+  30,
+  "Muitas tentativas de atualização. Aguarde alguns minutos."
+);
 
-const limitarVerificacao = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: process.env.NODE_ENV === "test" ? 1000 : 15,
-  standardHeaders: "draft-8",
-  legacyHeaders: false,
-  message: {
-    success: false,
-    message:
-      "Muitas tentativas de verificação. Aguarde alguns minutos.",
-  },
-});
+const limitarEnvioLink = criarLimitador(
+  5,
+  "Muitas solicitações de link. Aguarde alguns minutos."
+);
+
+const limitarVerificacao = criarLimitador(
+  15,
+  "Muitas tentativas de verificação. Aguarde alguns minutos."
+);
 
 router.post(
   "/register",
@@ -94,6 +77,7 @@ router.post(
   "/login",
   validarOrigem,
   limitarAutenticacao,
+  limitarConta,
   login
 );
 
@@ -127,8 +111,8 @@ router.patch(
 router.post(
   "/send-verification",
   validarOrigem,
-  limitarEnvioCodigo,
-  enviarCodigoEmail
+  limitarEnvioLink,
+  enviarLinkEmail
 );
 
 router.post(
@@ -138,7 +122,27 @@ router.post(
   verificarEmail
 );
 
-const { listarSessoes } = require("../controllers/accountSecurityController");
-router.get("/sessions", autenticar, listarSessoes);
+const {
+  listarSessoes,
+} = require("../controllers/accountSecurityController");
 
+router.get(
+  "/sessions",
+  autenticar,
+  listarSessoes
+);
+
+const passwordReset = require("../services/passwordResetService");
+const executarSenha = fn => async (req, res, next) => {
+  try { res.json({ success: true, data: await fn(req.body) }); } catch (erro) { next(erro); }
+};
+router.post("/forgot-password", validarOrigem, limitarEnvioLink, executarSenha(dados => passwordReset.solicitarRecuperacao(dados?.email)));
+router.post("/reset-password", validarOrigem, limitarVerificacao, executarSenha(dados => passwordReset.redefinirSenha(dados)));
+
+const emailChange = require('../services/emailChangeService');
+router.post('/me/email-change', validarOrigem, autenticar, limitarEnvioLink, async (req, res, next) => { try { res.json({ success: true, data: await emailChange.solicitar(req.auth.userId, req.body) }); } catch (error) { next(error); } });
+router.delete('/me/email-change', validarOrigem, autenticar, limitarAtualizacao, async (req, res, next) => {
+  try { res.json({ success: true, data: await emailChange.cancelar(req.auth.userId) }); } catch (error) { next(error); }
+});
+router.post('/confirm-email-change', validarOrigem, limitarVerificacao, executarSenha(dados => emailChange.confirmar(dados?.token)));
 module.exports = router;
