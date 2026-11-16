@@ -180,11 +180,11 @@ describe("DM-USER-01-MIG — Diagnóstico", () => {
     );
 
     expect(resultado.stdout).toContain(
-      "Índice cpf_1: OK"
+      "Índice cpf_ativo_unico: OK"
     );
 
     expect(resultado.stdout).toContain(
-      "Índice email_1: OK"
+      "Índice email_ativo_unico: OK"
     );
 
     expect(resultado.stdout).toContain(
