@@ -67,17 +67,17 @@ describe("DM-USER-01 — Modelo User", () => {
 
     expect(indice).toBeDefined();
     expect(indice[1].unique).toBe(true);
-    expect(indice[1].partialFilterExpression).toEqual({ cpf: { $type: "string" } });
+    expect(indice[1].partialFilterExpression).toEqual({ ativo: true, cpf: { $type: "string" } });
   });
 
-  it("declara índice único global para e-mail", () => {
+  it("declara índice único entre ativos para e-mail", () => {
     const indice = User.schema.indexes().find(
       ([campos]) => campos.email === 1
     );
 
     expect(indice).toBeDefined();
     expect(indice[1].unique).toBe(true);
-    expect(indice[1].partialFilterExpression).toBeUndefined();
+    expect(indice[1].partialFilterExpression).toEqual({ ativo: true, email: { $type: "string" } });
   });
 });
 
@@ -132,13 +132,13 @@ describe("DM-USER-01 — Unicidade no MongoDB", () => {
 
     const indices = await UsuarioTeste.collection.indexes();
 
-    for (const nome of ["cpf_1", "email_1"]) {
+    for (const nome of ["cpf_ativo_unico", "email_ativo_unico"]) {
       const indice = indices.find((item) => item.name === nome);
 
       if (
         !indice ||
         indice.unique !== true ||
-        (nome === "cpf_1" ? indice.partialFilterExpression?.cpf?.$type !== "string" : indice.partialFilterExpression !== undefined)
+        indice.partialFilterExpression?.ativo !== true
       ) {
         throw new Error(`Índice inválido: ${nome}`);
       }
@@ -183,7 +183,7 @@ describe("DM-USER-01 — Unicidade no MongoDB", () => {
     ).rejects.toMatchObject({ code: 11000 });
   });
 
-  it("rejeita CPF pertencente a usuário desativado", async () => {
+  it("permite CPF pertencente a usuário desativado", async () => {
     const usuario = await criarUsuario({ ativo: false });
 
     expect(usuario.ativo).toBe(false);
@@ -192,10 +192,10 @@ describe("DM-USER-01 — Unicidade no MongoDB", () => {
       criarUsuario({
         cpf: usuario.cpf,
       })
-    ).rejects.toMatchObject({ code: 11000 });
+    ).resolves.toHaveProperty("ativo", true);
   });
 
-  it("rejeita e-mail pertencente a usuário desativado", async () => {
+  it("permite e-mail pertencente a usuário desativado", async () => {
     const email = `inativo-${new mongoose.Types.ObjectId()}@example.com`;
 
     await criarUsuario({
@@ -207,6 +207,6 @@ describe("DM-USER-01 — Unicidade no MongoDB", () => {
       criarUsuario({
         email,
       })
-    ).rejects.toMatchObject({ code: 11000 });
+    ).resolves.toHaveProperty("ativo", true);
   });
 });
