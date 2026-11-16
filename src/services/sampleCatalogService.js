@@ -2,7 +2,7 @@ const produtos = require("../../shared/sampleProducts.json");
 const { AuthError } = require("./authService");
 
 function configuracao() {
-  const modo = process.env.CHECKOUT_TEST_MODE || "gratuito";
+  const modo = process.env.CHECKOUT_TEST_MODE || "mercado_pago";
   const habilitado = process.env.NODE_ENV !== "production" && ["gratuito", "mercado_pago"].includes(modo);
   return { modo, habilitado, freteCalculadoPorCep: true, ambienteTeste: true };
 }
@@ -11,7 +11,7 @@ function exigirTeste() {
 }
 function catalogo() {
   const config = configuracao();
-  return { ...config, produtos: produtos.map((p) => ({ ...p, price: config.modo === "mercado_pago" ? 1 : 0 })) };
+  return { ...config, produtos: produtos.map((p) => ({ ...p, price: config.modo === "mercado_pago" ? p.price : 0, ...(config.modo === "gratuito" ? { originalPrice: 0, discount: 0 } : {}) })) };
 }
 function productId(id) { return `0000000000000000000001${String(id).padStart(2, "0")}`; }
 function variantId(id) { return `0000000000000000000002${String(id).padStart(2, "0")}`; }
