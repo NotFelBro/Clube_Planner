@@ -774,16 +774,16 @@ async function criarPedidoCheckout({
       }
 
       // 13. Definir o prazo da reserva.
-      // Margem de segurança para o limite de 15 minutos.
-      const expiresAt = new Date(
-        Date.now() + 14 * 60 * 1000
-      );
+      // Prazo de 15 minutos a partir da criação do pedido.
+      const criadoEm = new Date();
+      const expiresAt = new Date(criadoEm.getTime() + 15 * 60 * 1000);
 
       // 14. Criar o pedido na mesma transação.
       const [pedido] = await Order.create(
         [
           {
             _id: orderId,
+            createdAt: criadoEm,
             userId,
 
             checkoutIdempotencyKey: chave,
