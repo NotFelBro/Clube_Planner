@@ -13,12 +13,13 @@ const categoryNames = {
 
 export default function Colecoes() {
   const [searchParams] = useSearchParams();
-  const { addToCart, products } = useStore();
+  const { addToCart, products, categories } = useStore();
+  const nomes = Array.isArray(categories) ? Object.fromEntries(categories.map(c => [c.id, c.name])) : categoryNames;
 
   const requestedCategory = searchParams.get("categoria");
-  const category = Object.hasOwn(categoryNames, requestedCategory) ? requestedCategory : null;
+  const category = Object.hasOwn(nomes, requestedCategory) ? requestedCategory : null;
   const categoryName =
-    categoryNames[category] ?? "Todas as coleções";
+    nomes[category] ?? "Todas as coleções";
 
   const filteredProducts = category
     ? products.filter(
@@ -84,9 +85,7 @@ export default function Colecoes() {
                     backgroundColor: product.background,
                   }}
                 >
-                  <span className="font-display text-lg font-semibold text-slatebrand">
-                    {product.illustration}
-                  </span>
+                  <img src={product.image} alt={product.name} loading="lazy" decoding="async" className="h-full w-full rounded-xl object-contain" />
                 </div>
 
                 <h2 className="mt-5 font-semibold">
@@ -111,6 +110,7 @@ export default function Colecoes() {
 
                   <button
                     type="button"
+                    disabled={product.stock === 0}
                     onClick={() => addToCart(product)}
                     aria-label={`Adicionar ${product.name} à sacola`}
                     className="flex h-11 w-11 items-center justify-center rounded-lg bg-sage text-xl text-white"
