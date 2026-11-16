@@ -4,18 +4,25 @@ import "dotenv/config";
 
 // ============================================================
 // DM-USER-01-MIG
-// Auditoria dos índices globais de CPF e e-mail
+// Auditoria dos índices de CPF e e-mail
 //
 // Modo disponível: --check
 // Ambiente autorizado: clube_planner_test
 // Operações: somente leitura
+//
+// Regras:
+// - CPF opcional no cadastro
+// - CPF preenchido deve ser válido e único
+// - E-mail obrigatório, normalizado e único
+// - Índice cpf_ativo_unico parcial para CPFs do tipo string
+// - Índice email_ativo_unico único e não parcial
 // ============================================================
 
 const BANCO_PERMITIDO = "clube_planner_test";
 
 const INDICES_ESPERADOS = [
-  { nome: "cpf_1", campo: "cpf" },
-  { nome: "email_1", campo: "email" },
+  { nome: "cpf_ativo_unico", campo: "cpf" },
+  { nome: "email_ativo_unico", campo: "email" },
 ];
 
 // ============================================================
@@ -24,7 +31,9 @@ const INDICES_ESPERADOS = [
 
 function validarDestino(uri) {
   if (!uri) {
-    throw new Error("MONGODB_TEST_URI não configurada.");
+    throw new Error(
+      "MONGODB_TEST_URI não configurada."
+    );
   }
 
   let url;
@@ -32,7 +41,9 @@ function validarDestino(uri) {
   try {
     url = new URL(uri);
   } catch {
-    throw new Error("URI do MongoDB inválida.");
+    throw new Error(
+      "URI do MongoDB inválida."
+    );
   }
 
   const destinoValido =
@@ -45,10 +56,11 @@ function validarDestino(uri) {
     url.hash === "";
 
   if (!destinoValido) {
-    throw new Error("Destino MongoDB não autorizado.");
+    throw new Error(
+      "Destino MongoDB não autorizado."
+    );
   }
 
-  // Permite somente parâmetros de conexão previamente aprovados.
   const parametrosPermitidos = new Set([
     "replicaSet",
     "directConnection",
@@ -67,25 +79,36 @@ function validarDestino(uri) {
     url.searchParams.has("replicaSet") &&
     url.searchParams.get("replicaSet") !== "rs0"
   ) {
-    throw new Error("Replica set não autorizado.");
+    throw new Error(
+      "Replica set não autorizado."
+    );
+  }
+
+  if (url.searchParams.has("directConnection")) {
+    const valor = url.searchParams.get(
+      "directConnection"
+    );
+
+    if (!["true", "false"].includes(valor)) {
+      throw new Error(
+        "Valor de directConnection inválido."
+      );
+    }
   }
 
   if (
-    url.searchParams.has("directConnection") &&
-    !["true", "false"].includes(
-      url.searchParams.get("directConnection")
+    url.searchParams.has(
+      "serverSelectionTimeoutMS"
     )
   ) {
-    throw new Error("Valor de directConnection inválido.");
-  }
-
-  if (url.searchParams.has("serverSelectionTimeoutMS")) {
     const timeout = url.searchParams.get(
       "serverSelectionTimeoutMS"
     );
 
     if (!/^[1-9]\d*$/.test(timeout)) {
-      throw new Error("Timeout de conexão inválido.");
+      throw new Error(
+        "Timeout de conexão inválido."
+      );
     }
   }
 
@@ -93,28 +116,39 @@ function validarDestino(uri) {
 }
 
 // ============================================================
-// 2. Normalização e validação
+// 2. Normalização e validação dos dados
 // ============================================================
 
 function normalizarCPF(valor) {
-  if (typeof valor !== "string") return null;
+  if (typeof valor !== "string") {
+    return null;
+  }
 
   return valor.replace(/\D/g, "");
 }
 
 function validarCPF(valor) {
-  if (typeof valor !== "string") return false;
+  if (typeof valor !== "string") {
+    return false;
+  }
 
   const cpf = valor.replace(/\D/g, "");
 
-  if (!/^\d{11}$/.test(cpf)) return false;
-  if (/^(\d)\1{10}$/.test(cpf)) return false;
+  if (!/^\d{11}$/.test(cpf)) {
+    return false;
+  }
+
+  if (/^(\d)\1{10}$/.test(cpf)) {
+    return false;
+  }
 
   function calcularDigito(tamanho) {
     let soma = 0;
 
     for (let i = 0; i < tamanho; i++) {
-      soma += Number(cpf[i]) * (tamanho + 1 - i);
+      soma +=
+        Number(cpf[i]) *
+        (tamanho + 1 - i);
     }
 
     const resto = (soma * 10) % 11;
@@ -129,7 +163,9 @@ function validarCPF(valor) {
 }
 
 function normalizarEmail(valor) {
-  if (typeof valor !== "string") return null;
+  if (typeof valor !== "string") {
+    return null;
+  }
 
   return valor.trim().toLowerCase();
 }
@@ -164,10 +200,21 @@ function validarIndice(indice, campo) {
       Object.keys(indice.collation).length === 1
     );
 
+  // O CPF é opcional.
+  //
+  // O índice parcial aplica unicidade apenas
+  // aos documentos em que CPF é uma string.
+  //
+  // Não aceitamos outros filtros parciais,
+  // para evitar enfraquecer a unicidade.
+
+  const filtroParcialEsperado = { ativo: true, [campo]: { $type: "string" } };
+  const filtroParcialCorreto = JSON.stringify(indice.partialFilterExpression) === JSON.stringify(filtroParcialEsperado);
+
   return (
     chaveCorreta &&
     indice.unique === true &&
-    indice.partialFilterExpression === undefined &&
+    filtroParcialCorreto &&
     indice.sparse !== true &&
     collationCorreta
   );
@@ -192,7 +239,7 @@ async function auditarUsuarios(colecao) {
   const emailsEncontrados = new Set();
 
   const cursor = colecao.find(
-    {},
+    { ativo: true },
     {
       projection: {
         _id: 0,
@@ -207,25 +254,42 @@ async function auditarUsuarios(colecao) {
     for await (const usuario of cursor) {
       resultado.documentos++;
 
-      const cpf = normalizarCPF(usuario.cpf);
-      const email = normalizarEmail(usuario.email);
+      // ======================================================
+      // 4.1. Validação do CPF opcional
+      // ======================================================
 
-      // Validação do CPF
-      if (!validarCPF(cpf)) {
-        resultado.cpfInvalido++;
-      } else {
-        if (cpf !== usuario.cpf) {
-          resultado.cpfNaoNormalizado++;
-        }
+      const cpfInformado =
+        usuario.cpf !== undefined &&
+        usuario.cpf !== null;
 
-        if (cpfsEncontrados.has(cpf)) {
-          resultado.duplicadosCPF++;
+      if (cpfInformado) {
+        const cpf = normalizarCPF(
+          usuario.cpf
+        );
+
+        if (!validarCPF(cpf)) {
+          resultado.cpfInvalido++;
         } else {
-          cpfsEncontrados.add(cpf);
+          if (cpf !== usuario.cpf) {
+            resultado.cpfNaoNormalizado++;
+          }
+
+          if (cpfsEncontrados.has(cpf)) {
+            resultado.duplicadosCPF++;
+          } else {
+            cpfsEncontrados.add(cpf);
+          }
         }
       }
 
-      // Validação do e-mail
+      // ======================================================
+      // 4.2. Validação do e-mail obrigatório
+      // ======================================================
+
+      const email = normalizarEmail(
+        usuario.email
+      );
+
       if (!validarEmail(email)) {
         resultado.emailInvalido++;
       } else {
@@ -268,29 +332,50 @@ async function executar() {
 
   validarDestino(uri);
 
-  const conexao = mongoose.createConnection(uri, {
-    serverSelectionTimeoutMS: 5000,
-    autoIndex: false,
-  });
+  const conexao = mongoose.createConnection(
+    uri,
+    {
+      serverSelectionTimeoutMS: 5000,
+      autoIndex: false,
+    }
+  );
 
   try {
     await conexao.asPromise();
 
-    if (conexao.name !== BANCO_PERMITIDO) {
-      throw new Error("Banco inesperado.");
+    if (
+      conexao.name !== BANCO_PERMITIDO
+    ) {
+      throw new Error(
+        "Banco inesperado."
+      );
     }
 
-    const colecao = conexao.db.collection("users");
-    const indices = await colecao.indexes();
+    const colecao =
+      conexao.db.collection("users");
 
-    console.log("\n=== DM-USER-01-MIG | PRECHECK ===");
-    console.log("Banco:", conexao.name);
+    const indices =
+      await colecao.indexes();
+
+    console.log(
+      "\n=== DM-USER-01-MIG | PRECHECK ==="
+    );
+
+    console.log(
+      "Banco:",
+      conexao.name
+    );
 
     let indicesInvalidos = 0;
 
+    // ========================================================
+    // 5.1. Auditoria dos índices
+    // ========================================================
+
     for (const esperado of INDICES_ESPERADOS) {
       const indice = indices.find(
-        (item) => item.name === esperado.nome
+        (item) =>
+          item.name === esperado.nome
       );
 
       const valido = validarIndice(
@@ -308,9 +393,17 @@ async function executar() {
       );
     }
 
-    const resultado = await auditarUsuarios(colecao);
+    // ========================================================
+    // 5.2. Auditoria dos usuários
+    // ========================================================
 
-    console.log("\nDocumentos:", resultado.documentos);
+    const resultado =
+      await auditarUsuarios(colecao);
+
+    console.log(
+      "\nDocumentos:",
+      resultado.documentos
+    );
 
     console.log(
       "CPF inválido/ausente:",
@@ -355,7 +448,10 @@ async function executar() {
       resultado.duplicadosCPF +
       resultado.duplicadosEmail;
 
-    console.log("\nÍndices inválidos:", indicesInvalidos);
+    console.log(
+      "\nÍndices inválidos:",
+      indicesInvalidos
+    );
 
     if (inconsistencias > 0) {
       console.log(
@@ -369,13 +465,23 @@ async function executar() {
       );
     }
 
-    console.log("Nenhum dado ou índice foi alterado.");
+    console.log(
+      "Nenhum dado ou índice foi alterado."
+    );
   } finally {
     await conexao.close();
   }
 }
 
+// ============================================================
+// 7. Tratamento de erros
+// ============================================================
+
 executar().catch((erro) => {
-  console.error("Falha no precheck:", erro.message);
+  console.error(
+    "Falha no precheck:",
+    erro.message
+  );
+
   process.exitCode = 1;
 });
