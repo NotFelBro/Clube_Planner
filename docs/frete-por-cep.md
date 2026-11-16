@@ -38,3 +38,17 @@ O fluxo existente continua sendo de demonstração, sem entrega real e com pagam
 - BrasilAPI CEP V2: https://brasilapi.com.br/docs#tag/CEP-V2
 - Implementação da geolocalização: https://github.com/BrasilAPI/BrasilAPI/blob/main/pages/api/cep/v2/%5Bcep%5D.js
 - Frete no Mercado Pago: https://www.mercadopago.com.br/developers/pt/docs/checkout-pro-preferences/additional-settings/shipping-cost
+
+## Cupons de frete em produtos participantes
+
+O catálogo compartilhado usa `shippingCouponLevel` apenas nos produtos participantes:
+Planner Semanal (FRETE1), Kit de Canetas Pastel (FRETE2) e Agenda Permanente (FRETE3).
+Cada código zera o frete do pedido somente se o CEP resultar no mesmo nível do cupom
+(1: até 10 km; 2: acima de 10 até 30 km; 3: acima de 30 km).
+Basta uma unidade participante na compra; outros produtos podem acompanhar.
+Não há acúmulo: o checkout permite um código por pedido, selecionado pelo cliente.
+
+A cotação recebe `itens` e `cupomFrete`. O servidor confere o catálogo, os itens e o nível;
+o checkout repete essa validação sobre o CEP do endereço salvo. O snapshot do pedido
+registra código, valor original e desconto do frete, separadamente dos descontos dos produtos.
+O frete grátis preserva a distância e o nível calculados. Sem cupom, aplicam-se as tarifas normais.
