@@ -13,6 +13,7 @@ app.disable("etag");
 
 app.disable("x-powered-by");
 
+require("./config/transport").configurarTransporte(app);
 app.use(helmet());
 app.use("/api", security.contextoRequisicao);
 
