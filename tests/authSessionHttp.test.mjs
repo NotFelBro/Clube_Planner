@@ -315,6 +315,23 @@ describe("Autenticação — Sessões HTTP", () => {
     expect(perfil.body.data.usuario.emailVerificado).toBe(true);
   });
 
+  it('emite refresh cookie Secure em produção e permite HTTP no desenvolvimento', async () => {
+    const dados = await criarUsuario();
+    const anterior = process.env.NODE_ENV;
+    try {
+      for (const ambiente of ['production', 'development']) {
+        process.env.NODE_ENV = ambiente;
+        const resposta = await fazerLogin(dados);
+        expect(resposta.status).toBe(200);
+        const cookie = resposta.headers['set-cookie'].find(c => c.startsWith('refreshToken='));
+        expect(cookie).toContain('HttpOnly');
+        expect(cookie).toContain('SameSite=Lax');
+        expect(cookie).toContain('Path=/api/v1/auth');
+        expect(cookie.includes('; Secure')).toBe(ambiente === 'production');
+      }
+    } finally { process.env.NODE_ENV = anterior; }
+  });
+
   it("renova uma sessão válida", async () => {
     const { cookie } =
       await criarSessaoDeTeste();
