@@ -25,3 +25,16 @@ substituem a validação operacional de disponibilidade nem a homologação exte
   substitui aplicação e validação no domínio público.
 
 Procedimento e limites: [validação RNF-02/RF-10](rnf02-rf10-validacao.md).
+
+## Implantação escolhida — Vercel e Atlas
+
+O usuário escolheu manter frontend e backend na Vercel, com MongoDB Atlas existente.
+A entrada da API reutiliza conexões, aguarda índices e não depende dos timers do
+servidor local. A rota de manutenção usa segredo; o Hobby possui agendamento diário
+e limpeza adicional durante o uso da loja. Isso não comprova liberação a cada minuto
+sem tráfego. Pagamentos reais continuam desativados.
+
+A configuração com Caddy permanece como alternativa para servidor próprio; na
+Vercel a terminação TLS é da plataforma. A publicação completa ainda requer mudar
+o Root Directory, cadastrar variáveis privadas/rede Atlas e validar a API pública.
+Veja [implantação Vercel + Atlas](deploy-vercel-atlas.md).
