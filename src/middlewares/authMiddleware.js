@@ -20,7 +20,7 @@ async function autenticar(req, res, next) {
 
   if (
     typeof authorization !== "string" ||
-    !/^Bearer [^\s]+$/i.test(authorization)
+    (authorization.length > 4096 || !/^Bearer [^\s]+$/i.test(authorization))
   ) {
     return responderNaoAutorizado(res);
   }
@@ -61,11 +61,12 @@ async function autenticar(req, res, next) {
     const usuario = await User.findOne({
       _id: userId,
       ativo: true,
+      emailVerificado: true,
     })
-      .select("_id role")
+      .select("_id role credencialVersao")
       .lean();
 
-    if (!usuario) {
+    if (!usuario || (sessao.credencialVersao ?? 0) !== (usuario.credencialVersao ?? 0)) {
       return responderNaoAutorizado(res);
     }
 
