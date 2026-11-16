@@ -1,7 +1,7 @@
 import InfoSidebar from "./InfoSidebar.jsx";
 import { siteSections } from "../../data/siteSections.js";
 import BrandLogo from "../brand/BrandLogo.jsx";
-import { products as sampleProducts } from "../../data/products.js";
+import { mergeCatalogImages } from "../../data/products.js";
 import { shopApi } from "../../services/shopApi.js";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 
@@ -104,7 +104,11 @@ function Header({
   cartCount,
   search,
   setSearch,
+  storeCategories,
+  loja,
 }) {
+  const { usuario } = useAuth();
+  const primeiroNome = usuario?.nome?.trim().split(/\s+/)[0];
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
   const activeCategory = ["/loja", "/colecoes"].includes(location.pathname)
@@ -130,7 +134,7 @@ function Header({
   return (
     <>
       <div className="bg-slatebrand px-4 py-3 text-center text-xs text-white">
-        Frete a partir de R$ 3,00 • Calculado pelo CEP de entrega
+        {loja?.mensagemTopo || "Frete a partir de R$ 3,00 • Calculado pelo CEP de entrega"}
       </div>
 
         <header className="sticky top-0 z-50 w-full shrink-0 border-b border-line bg-sand shadow-sm">
@@ -166,7 +170,7 @@ function Header({
                 className="flex min-h-11 items-center gap-1.5 whitespace-nowrap transition hover:text-terracotta"
               >
                 <UserIcon />
-                <span className="hidden sm:inline">Meu perfil</span><span className="sm:hidden">Perfil</span>
+                <span className="max-w-36 truncate">{primeiroNome ? `Olá, ${primeiroNome}.` : "Entrar"}</span>
               </NavLink>
 
               <NavLink
@@ -208,7 +212,7 @@ function Header({
                 menuOpen ? "flex" : "hidden"
               } col-span-2 flex-col items-center gap-1 pb-3 lg:col-span-1 lg:col-start-2 lg:flex lg:flex-row lg:justify-between lg:gap-4 lg:py-4`}
             >
-              {categories.map(({ label, category }) => (
+              {(Array.isArray(storeCategories) ? storeCategories.map(c => ({ label: c.name, category: c.id })) : categories).map(({ label, category }) => (
                 <Link
                   key={category}
                   to={categoryPath(category)}
@@ -226,7 +230,7 @@ function Header({
   );
 }
 
-function Footer() {
+function Footer({ loja }) {
   return (
     <footer className="bg-slatebrand text-sand">
       <div className="mx-auto grid max-w-[1320px] gap-9 px-5 py-10 sm:grid-cols-2 lg:grid-cols-4">
@@ -246,6 +250,7 @@ function Footer() {
             <h2 className="text-xs font-semibold uppercase tracking-wider text-sage">{section.title}</h2>
             <ul className="mt-4 flex flex-col gap-2 text-[13px]">
               {section.items.map((item) => <li key={item}>{item}</li>)}
+            {section.id === "atendimento" && loja?.emailAtendimento && <li><a href={`mailto:${loja.emailAtendimento}`}>{loja.emailAtendimento}</a></li>}
             </ul>
           </div>
         ))}
@@ -253,7 +258,7 @@ function Footer() {
 
       <div className="mx-auto flex max-w-[1320px] flex-col gap-3 border-t border-white/20 px-5 py-5 text-[11px] sm:flex-row sm:justify-between">
         <p>
-          © {new Date().getFullYear()} Clube Planner.
+          © {new Date().getFullYear()} {loja?.nome || "Clube Planner"}.
           Todos os direitos reservados.
         </p>
 
@@ -275,17 +280,28 @@ function StoreLayoutContent({ userId }) {
   const [cartItems, setCart] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(storageKey) || localStorage.getItem("clube-sacola-visitante") || "[]");
-      return Array.isArray(saved) ? saved.filter((p) => sampleProducts.some((s) => s.id === p?.id)).slice(0, sampleProducts.length * 99) : [];
+      return Array.isArray(saved) ? saved.filter((p) => Number.isSafeInteger(p?.id) && p.id > 0).slice(0, 9900) : [];
     } catch { return []; }
   });
-  const [products, setProducts] = useState(sampleProducts);
+  const [products, setProducts] = useState([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState("");
   const [checkoutConfig, setCheckoutConfig] = useState(null);
   useEffect(() => {
     let ativo = true;
-    shopApi("/catalog").then((dados) => {
-      if (ativo) { setProducts(dados.produtos); setCheckoutConfig(dados); }
-    }).catch(() => {});
-    return () => { ativo = false; };
+    let carregando = false;
+    const carregar = async () => {
+      if (carregando) return;
+      carregando = true;
+      try { const dados = await shopApi("/catalog"); if (ativo) { setProducts(mergeCatalogImages(dados.produtos)); setCheckoutConfig(dados); setCatalogError(""); } }
+      catch (error) { if (ativo) setCatalogError(error.message); }
+      finally { carregando = false; if (ativo) setCatalogLoading(false); }
+    };
+    void carregar();
+    const timer = setInterval(carregar, 30000);
+    const atualizar = event => { if (event.type !== "storage" || event.key === "clube-catalogo-revisao") void carregar(); };
+    window.addEventListener("focus", atualizar); window.addEventListener("storage", atualizar); window.addEventListener("clube-catalogo-atualizado", atualizar);
+    return () => { ativo = false; clearInterval(timer); window.removeEventListener("focus", atualizar); window.removeEventListener("storage", atualizar); window.removeEventListener("clube-catalogo-atualizado", atualizar); };
   }, []);
   useEffect(() => {
     try {
@@ -297,7 +313,7 @@ function StoreLayoutContent({ userId }) {
   const [search, setSearch] = useState("");
 
   function addToCart(product) {
-    setCart((previous) => previous.filter((p) => p.id === product.id).length >= 99 ? previous : [...previous, { id: product.id }]);
+    setCart((previous) => previous.filter((p) => p.id === product.id).length >= Math.min(99, product.stock ?? 99) ? previous : [...previous, { id: product.id }]);
   }
 
   function removeFromCart(productId) {
@@ -311,7 +327,7 @@ function StoreLayoutContent({ userId }) {
   function updateCartQuantity(productId, quantity) {
     const nextQuantity = Math.max(
       0,
-      Math.min(99, Math.trunc(Number(quantity) || 0))
+      Math.min(99, products.find(p => p.id === productId)?.stock ?? 99, Math.trunc(Number(quantity) || 0))
     );
 
     setCart((previous) => {
@@ -348,6 +364,9 @@ function StoreLayoutContent({ userId }) {
   const store = {
     products,
     checkoutConfig,
+    categories: checkoutConfig?.categorias || [],
+    catalogLoading,
+    catalogError,
     cart,
     cartCount: cart.length,
     cartSubtotal,
@@ -363,6 +382,8 @@ function StoreLayoutContent({ userId }) {
     <StoreContext.Provider value={store}>
       <div className="flex min-h-screen min-w-0 flex-col bg-sand text-slatebrand">
         <Header
+          storeCategories={checkoutConfig?.categorias}
+          loja={checkoutConfig?.loja}
           cartCount={cart.length}
           search={search}
           setSearch={setSearch}
@@ -372,10 +393,11 @@ function StoreLayoutContent({ userId }) {
           id="conteudo"
           className="wallpaper-light w-full min-w-0 flex-1"
         >
-          <Outlet context={store} />
+          {catalogError && <p role="alert" className="mx-auto max-w-5xl rounded-lg bg-red-50 p-4 text-sm text-red-800">{catalogError} Atualize a página para tentar novamente.</p>}
+          {catalogLoading ? <p role="status" className="p-10 text-center">Carregando loja...</p> : <Outlet context={store} />}
         </main>
 
-        <Footer />
+        <Footer loja={checkoutConfig?.loja} />
       </div>
     </StoreContext.Provider>
   );
