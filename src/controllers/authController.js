@@ -2,6 +2,7 @@
 const {
   cadastrarUsuario,
   atualizarDadosPessoais,
+  usuarioPerfil,
   AuthError,
 } = require("../services/authService");
 
@@ -13,11 +14,12 @@ const {
 } = require("../services/sessionService");
 
 const {
-  solicitarCodigo,
-  confirmarCodigo,
+  solicitarLink,
+  confirmarLink,
 } = require("../services/emailVerificationService");
 
 const User = require("../models/User");
+const { validarSenha, verificarSenha } = require("../services/passwordService");
 
 const CAMINHO_COOKIE = "/api/v1/auth";
 
@@ -51,38 +53,38 @@ function usuarioPublico(usuario) {
     email: usuario.email,
     role: usuario.role,
     emailVerificado: usuario.emailVerificado === true,
-    emailVerificadoEm: usuario.emailVerificadoEm ?? null,
+    emailVerificadoEm:
+      usuario.emailVerificadoEm ?? null,
   };
 }
 
 async function cadastro(req, res, next) {
   try {
     const usuario = await cadastrarUsuario(req.body);
-
-    let codigoEnviado = false;
+    let linkEnviado = false;
 
     try {
-      await solicitarCodigo(usuario.email);
-      codigoEnviado = true;
+      await solicitarLink(usuario.email);
+      linkEnviado = true;
     } catch (erro) {
       if (erro.statusCode !== 503) {
         return next(erro);
       }
 
       console.error(
-        "Falha no envio do código após cadastro:",
+        "Falha no envio após cadastro:",
         erro.message
       );
     }
 
     return res.status(201).json({
       success: true,
-      message: codigoEnviado
-        ? "Cadastro realizado. Verifique seu e-mail para confirmar a conta."
-        : "Cadastro realizado, mas não foi possível enviar o código. Solicite um novo código.",
+      message: linkEnviado
+        ? "Cadastro realizado. Verifique o link enviado para seu e-mail."
+        : "Cadastro realizado, mas o link não pôde ser enviado. Solicite um novo envio.",
       data: {
         usuario,
-        codigoEnviado,
+        linkEnviado,
       },
     });
   } catch (erro) {
@@ -93,20 +95,62 @@ async function cadastro(req, res, next) {
 async function login(req, res, next) {
   try {
     const email = req.body?.email;
-    if (typeof email !== "string" || email.trim().length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    const senha = validarSenha(req.body?.senha);
+
+    if (
+      typeof email !== "string" ||
+      email.trim().length > 254 ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+        email.trim()
+      )
+    ) {
       throw new AuthError("E-mail inválido.");
     }
-    const usuario = await User.findOne({ email: email.trim().toLowerCase(), ativo: true })
-      .select("_id nome email role emailVerificado emailVerificadoEm").lean();
-    if (!usuario) throw new AuthError("E-mail não cadastrado ou conta inativa.", 401);
-    if (usuario.emailVerificado !== true) throw new AuthError("Confirme seu e-mail no cadastro antes de entrar.", 403);
-    const sessao = await criarSessao({ userId: String(usuario._id), userAgent: req.get("user-agent") });
-    res.cookie("refreshToken", sessao.refreshToken, opcoesCookie(sessao.expiresAt));
+
+    const usuario = await User.findOne({
+      email: email.trim().toLowerCase(),
+      ativo: true,
+    })
+      .select(
+        "_id nome email role emailVerificado emailVerificadoEm credencialVersao +senhaHash"
+      )
+      .lean();
+
+    const senhaCorreta = await verificarSenha(senha, usuario?.senhaHash);
+    if (!usuario || !senhaCorreta) {
+      throw new AuthError("E-mail ou senha incorretos. Se ainda não tem senha, use a opção de definir ou recuperar senha.", 401);
+    }
+
+    if (usuario.emailVerificado !== true) {
+      throw new AuthError(
+        "Confirme seu e-mail no cadastro antes de entrar.",
+        403
+      );
+    }
+
+    const sessao = await criarSessao({
+      userId: String(usuario._id),
+      credencialVersao: usuario.credencialVersao ?? 0,
+      userAgent: req.get("user-agent"),
+    });
+
+    res.cookie(
+      "refreshToken",
+      sessao.refreshToken,
+      opcoesCookie(sessao.expiresAt)
+    );
+
     return res.status(200).json({
       success: true,
-      data: { usuario: usuarioPublico(usuario), accessToken: sessao.accessToken, expiresAt: sessao.expiresAt },
+      data: {
+        usuario: usuarioPublico(usuario),
+        accessToken: sessao.accessToken,
+        expiresAt: sessao.expiresAt,
+      },
     });
-  } catch (erro) { return next(erro); }
+  } catch (erro) {
+    return next(erro);
+  }
 }
 
 async function refresh(req, res, next) {
@@ -128,7 +172,9 @@ async function refresh(req, res, next) {
       _id: sessao.userId,
       ativo: true,
     })
-      .select("_id nome email role emailVerificado emailVerificadoEm")
+      .select(
+        "_id nome email role emailVerificado emailVerificadoEm"
+      )
       .lean();
 
     if (!usuario) {
@@ -188,7 +234,9 @@ async function me(req, res, next) {
       _id: req.auth.userId,
       ativo: true,
     })
-      .select("_id nome email cpf role emailVerificado emailVerificadoEm")
+      .select(
+        "_id nome email cpf role emailVerificado emailVerificadoEm +alteracaoEmail.novoEmail +alteracaoEmail.expiraEm"
+      )
       .lean();
 
     if (!usuario) {
@@ -198,10 +246,7 @@ async function me(req, res, next) {
     return res.status(200).json({
       success: true,
       data: {
-        usuario: {
-          ...usuarioPublico(usuario),
-          cpf: usuario.cpf,
-        },
+        usuario: usuarioPerfil(usuario),
       },
     });
   } catch (erro) {
@@ -218,19 +263,18 @@ async function atualizarMeuPerfil(req, res, next) {
 
     return res.status(200).json({
       success: true,
-      message: "Dados pessoais atualizados com sucesso.",
-      data: {
-        usuario,
-      },
+      message:
+        "Dados pessoais atualizados com sucesso.",
+      data: { usuario },
     });
   } catch (erro) {
     return next(erro);
   }
 }
 
-async function enviarCodigoEmail(req, res, next) {
+async function enviarLinkEmail(req, res, next) {
   try {
-    const resultado = await solicitarCodigo(
+    const resultado = await solicitarLink(
       req.body?.email
     );
 
@@ -245,32 +289,12 @@ async function enviarCodigoEmail(req, res, next) {
 
 async function verificarEmail(req, res, next) {
   try {
-    const resultado = await confirmarCodigo(
-      req.body?.email,
-      req.body?.codigo
+    const usuario = await confirmarLink(
+      req.body?.token
     );
 
-    // O código já foi validado e consumido.
-    // Somente após essa confirmação criamos a sessão.
-    const emailNormalizado =
-      req.body.email.trim().toLowerCase();
-
-    const usuario = await User.findOne({
-      email: emailNormalizado,
-      ativo: true,
-      emailVerificado: true,
-    })
-      .select("_id nome email role emailVerificado emailVerificadoEm")
-      .lean();
-
-    if (!usuario) {
-      return res.status(200).json({
-        success: true,
-        message:
-          "E-mail confirmado com sucesso. Entre na sua conta para continuar.",
-      });
-    }
-
+    // O token já foi consumido e a conta foi
+    // confirmada. Agora criamos a sessão.
     try {
       const sessao = await criarSessao({
         userId: String(usuario._id),
@@ -285,7 +309,7 @@ async function verificarEmail(req, res, next) {
 
       return res.status(200).json({
         success: true,
-        message: resultado.mensagem,
+        message: "E-mail confirmado com sucesso.",
         data: {
           usuario: usuarioPublico(usuario),
           accessToken: sessao.accessToken,
@@ -293,9 +317,6 @@ async function verificarEmail(req, res, next) {
         },
       });
     } catch (erroSessao) {
-      // O e-mail permanece confirmado.
-      // Em caso de falha na sessão, o login
-      // por código continua disponível.
       console.error(
         "E-mail confirmado, mas falhou a criação da sessão:",
         erroSessao.code || erroSessao.message
@@ -305,6 +326,9 @@ async function verificarEmail(req, res, next) {
         success: true,
         message:
           "E-mail confirmado com sucesso. Entre na sua conta para continuar.",
+        data: {
+          sessaoCriada: false,
+        },
       });
     }
   } catch (erro) {
@@ -319,6 +343,6 @@ module.exports = {
   logout,
   me,
   atualizarMeuPerfil,
-  enviarCodigoEmail,
+  enviarLinkEmail,
   verificarEmail,
 };
