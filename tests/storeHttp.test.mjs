@@ -28,7 +28,7 @@ const emailService = require(
 );
 
 const enviarEmailOriginal =
-  emailService.enviarCodigoVerificacao;
+  emailService.enviarLinkVerificacao;
 
 
 const Order = require("../src/models/order");
@@ -136,6 +136,8 @@ function obterCookie(resposta) {
 async function criarUsuario() {
   const dados = {
     nome: "Cliente Sessão Teste",
+    senha: "senha-teste",
+    aceitouPrivacidade: true,
     email:
       `session-${randomUUID()}@example.com`,
   };
@@ -187,7 +189,7 @@ async function criarUsuario() {
 
 async function fazerLogin(dados, userAgent = "") {
   const resposta = await request(app).post(`${BASE}/login`)
-    .set("Origin", ORIGEM).set("User-Agent", userAgent).send({ email: dados.email });
+    .set("Origin", ORIGEM).set("User-Agent", userAgent).send({ email: dados.email, senha: dados.senha });
   expect(resposta.status).toBe(200);
   expect(resposta.body.data.accessToken).toBeTruthy();
   return resposta;
@@ -231,10 +233,12 @@ beforeAll(async () => {
   await Review.init();
 }, 30000);
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.spyOn(shipping, "cotarFrete").mockImplementation(async (cep) => ({ cep, nivel: 2, valorCentavos: 600, distanciaKm: 25.18, metodo: "linha_reta_entre_ceps", origem: shippingRules.origem }));
   vi.stubEnv("CHECKOUT_TEST_MODE", "gratuito");
-  emailService.enviarCodigoVerificacao = vi
+  await require("../src/services/catalogService").inicializarCatalogo({ estoqueInicial: 100 });
+  await require("../src/models/product").updateMany({ "variacoes.lojaId": { $in: Array.from({ length: 12 }, (_, i) => i + 1) } }, { $set: { "variacoes.$[].estoqueDisponivel": 100, "variacoes.$[].estoqueReservado": 0 } });
+  emailService.enviarLinkVerificacao = vi
     .fn()
     .mockResolvedValue(undefined);
 });
@@ -242,7 +246,7 @@ beforeEach(() => {
 afterEach(async () => {
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
-  emailService.enviarCodigoVerificacao =
+  emailService.enviarLinkVerificacao =
     enviarEmailOriginal;
 
   if (usuariosCriados.size === 0) {
@@ -265,6 +269,7 @@ afterEach(async () => {
 
 
   for (const model of [Order, Payment, Cart, Review]) await model.deleteMany({ userId: { $in: ids } });
+  await require("../src/models/adminEvent").deleteMany({ actorId: { $in: ids } });
   await Session.deleteMany({
     userId: { $in: ids },
   });
@@ -277,7 +282,7 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
-  emailService.enviarCodigoVerificacao =
+  emailService.enviarLinkVerificacao =
     enviarEmailOriginal;
 
   await mongoose.disconnect();
@@ -422,5 +427,53 @@ describe("Mercado Pago — confirmação consultada no servidor", () => {
     expect((await post(c, `/orders/${p.id}/payment`, {})).status).toBe(200);
     expect((await post(c, `/orders/${p.id}/payment`, {})).status).toBe(200);
     expect(criar).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Cancelamento pela conta do cliente', () => {
+  it('cancela pendente, repete com segurança e bloqueia pagamento e outra conta', async () => {
+    const c = await cliente(); const outra = await cliente();
+    const p = (await post(c, '/checkout', compra(c))).body.data.pedido;
+    expect((await post(outra, `/orders/${p.id}/cancel`, {})).status).toBe(404);
+    const cancelado = await post(c, `/orders/${p.id}/cancel`, {});
+    expect(cancelado.status).toBe(200);
+    expect(cancelado.body.data.pedido.status).toBe('cancelado');
+    expect(cancelado.body.data.pedido.cancelamentoSolicitadoEm).toBeTruthy();
+    expect((await post(c, `/orders/${p.id}/cancel`, {})).status).toBe(200);
+    expect((await post(c, `/orders/${p.id}/payment`, {})).status).toBe(409);
+  });
+  it('reembolsa pedido pago integralmente e não duplica o reembolso', async () => {
+    const c = await cliente();
+    const p = (await post(c, '/checkout', compra(c))).body.data.pedido;
+    const pagamento = { id: '7654321', external_reference: p.id, live_mode: false, currency_id: 'BRL', transaction_amount: 6, status: 'approved', date_last_updated: new Date().toISOString() };
+    await orders.aplicarPagamento(pagamento);
+    vi.spyOn(mp, 'encerrarPreferencia').mockResolvedValue({});
+    const reembolsado = { ...pagamento, status: 'refunded', date_last_updated: new Date(Date.now() + 1000).toISOString() };
+    vi.spyOn(mp, 'buscarPagamentos').mockResolvedValue([pagamento]);
+    vi.spyOn(mp, 'cancelarOuReembolsar').mockResolvedValue(reembolsado);
+    const resposta = await post(c, `/orders/${p.id}/cancel`, {});
+    expect(resposta.status).toBe(200);
+    expect(resposta.body.data.pedido).toMatchObject({ status: 'cancelado', pagamentoStatus: 'reembolsado', totalCentavos: 600 });
+    expect((await Payment.findOne({ orderId: p.id })).refundSucceededCentavos).toBe(600);
+    mp.buscarPagamentos.mockResolvedValue([reembolsado]);
+    expect((await post(c, `/orders/${p.id}/cancel`, {})).status).toBe(200);
+    expect((await Payment.findOne({ orderId: p.id })).refundSucceededCentavos).toBe(600);
+  });
+  it('recusa cancelamento depois de entregue', async () => {
+    const c = await cliente();
+    const p = (await post(c, '/checkout', compra(c))).body.data.pedido;
+    await Order.updateOne({ _id: p.id }, { $set: { status: 'entregue' } });
+    expect((await post(c, `/orders/${p.id}/cancel`, {})).status).toBe(409);
+  });
+  it('reembolsa aprovação tardia após cancelamento sem reativar o pedido', async () => {
+    const c = await cliente();
+    const p = (await post(c, '/checkout', compra(c))).body.data.pedido;
+    await post(c, `/orders/${p.id}/cancel`, {});
+    const pagamento = { id: '7654322', external_reference: p.id, live_mode: false, currency_id: 'BRL', transaction_amount: 6, status: 'approved', date_last_updated: new Date().toISOString() };
+    vi.spyOn(mp, 'cancelarOuReembolsar').mockResolvedValue({ ...pagamento, status: 'refunded', date_last_updated: new Date(Date.now() + 1000).toISOString() });
+    await orders.aplicarPagamento(pagamento);
+    const atualizado = (await get(c, `/orders/${p.id}`)).body.data.pedido;
+    expect(atualizado).toMatchObject({ status: 'cancelado', pagamentoStatus: 'reembolsado' });
+    expect((await Payment.findOne({ orderId: p.id })).refundSucceededCentavos).toBe(600);
   });
 });
