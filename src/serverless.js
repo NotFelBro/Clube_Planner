@@ -58,7 +58,13 @@ function criarHandler({
   handler.use(app);
   handler.use((error, req, res, next) => {
     if (res.headersSent) return next(error);
-    console.error(JSON.stringify({ evento: 'falha_serverless', tipo: error.name || 'Error', requestId: req.requestId }));
+    const codigo = Number.isSafeInteger(error.code) ? error.code : undefined;
+    const diagnosticos = { 13: 'permissao_banco', 18: 'autenticacao_banco', 85: 'opcoes_indice', 86: 'definicao_indice', 11000: 'duplicidade' };
+    // Atlas também pode usar 8000 para autenticação. Registrar só a categoria,
+    // nunca a mensagem original, que pode conter credenciais ou dados de clientes.
+    const diagnostico = codigo === 8000 && /bad auth|authentication failed/i.test(error.message || '')
+      ? 'autenticacao_banco' : diagnosticos[codigo];
+    console.error(JSON.stringify({ evento: 'falha_serverless', tipo: error.name || 'Error', codigo, diagnostico, requestId: req.requestId }));
     res.status(503).json({ success: false, message: 'Serviço temporariamente indisponível.', requestId: req.requestId });
   });
   return handler;
