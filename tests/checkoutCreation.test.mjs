@@ -232,6 +232,7 @@ describe("Criação transacional do checkout", () => {
       )
     );
 
+    expect(pedido.reserva.expiresAt.getTime() - pedido.createdAt.getTime()).toBe(15 * 60000);
     expect(pedido.status).toBe("aguardando_pagamento");
     expect(pedido.reserva.status).toBe("reservado");
 
@@ -274,6 +275,39 @@ describe("Criação transacional do checkout", () => {
     expect(persistido).not.toBeNull();
     expect(persistido.checkoutRequestFingerprint)
       .toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it('preserva snapshots após edição do catálogo/endereço e recusa gravações no pedido', async () => {
+    const usuario = await criarUsuario();
+    const produto = await criarProduto();
+    await criarCarrinho(usuario, [itemCarrinho(produto, 1)]);
+    const pedido = await criarPedidoCheckout(parametrosCheckout(usuario, 'snapshot-imutavel-001', [itemCarrinho(produto, 1)]));
+    const antes = await Order.findById(pedido._id).lean();
+    await Product.updateOne({ _id: produto._id }, { $set: { nome: 'Produto editado' } });
+    await User.updateOne({ _id: usuario._id }, { $set: { 'enderecos.0.numero': '999' } });
+    const depois = await Order.findById(pedido._id).lean();
+    expect(depois.itens).toEqual(antes.itens);
+    expect(depois.enderecoEntrega).toEqual(antes.enderecoEntrega);
+    pedido.itens[0].nomeProduto = 'Adulterado';
+    await expect(pedido.save()).rejects.toThrow('imutáveis');
+    await expect(pedido.save({ validateBeforeSave: false })).rejects.toThrow('imutáveis');
+    const endereco = await Order.findById(pedido._id);
+    endereco.enderecoEntrega.numero = '999';
+    await expect(endereco.save()).rejects.toThrow('imutáveis');
+    for (const update of [
+      { $set: { 'itens.0.quantidade': 100 } },
+      { $unset: { enderecoEntrega: 1 } },
+      { $push: { itens: antes.itens[0] } },
+      { $inc: { totalCentavos: 1 } },
+      { $rename: { codigoRastreio: 'enderecoEntrega.numero' } },
+      [{ $set: { totalCentavos: 0 } }],
+    ]) await expect(Order.updateOne({ _id: pedido._id }, update, { updatePipeline: Array.isArray(update) })).rejects.toThrow('imutáveis');
+    await expect(Order.findOneAndUpdate({ _id: pedido._id }, { $set: { enderecoEntrega: antes.enderecoEntrega } })).rejects.toThrow('imutáveis');
+    await expect(Order.replaceOne({ _id: pedido._id }, antes)).rejects.toThrow('imutáveis');
+    await expect(Order.bulkWrite([{ updateOne: { filter: { _id: pedido._id }, update: { $set: { totalCentavos: 0 } } } }])).rejects.toThrow('imutáveis');
+    expect((await Order.findById(pedido._id).lean()).itens).toEqual(antes.itens);
+    await Order.updateOne({ _id: pedido._id }, { $set: { codigoRastreio: 'BR123' } });
+    expect((await Order.findById(pedido._id)).codigoRastreio).toBe('BR123');
   });
 
   it("reutiliza o pedido original após alteração do carrinho", async () => {
