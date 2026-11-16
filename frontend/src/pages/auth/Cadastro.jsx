@@ -1,3 +1,5 @@
+import PasswordField from "../../components/auth/PasswordField.jsx";
+import PrivacyConsent from "../../components/auth/PrivacyConsent.jsx";
 import LoginCarousel from "../../components/auth/LoginCarousel.jsx";
 import { loginSlides } from "../../data/loginSlides.js";
 import BrandLogo from "../../components/brand/BrandLogo.jsx";
@@ -26,9 +28,9 @@ function FormField({ id, label, type = "text", placeholder, value, onChange, aut
   </div>;
 }
 
-const FORM_INICIAL = { name: "", email: "" };
+const FORM_INICIAL = { name: "", email: "", senha: "", aceitouPrivacidade: false };
 
-export default function Cadastro() {
+export default function Cadastro({ embedded = false }) {
   const navigate = useNavigate();
 
   const {
@@ -72,6 +74,11 @@ export default function Cadastro() {
       return;
     }
 
+    if (!form.senha || !form.aceitouPrivacidade) {
+      setMessage("Informe sua senha e aceite os termos de privacidade.");
+      return;
+    }
+
     const email = form.email
       .trim()
       .toLowerCase();
@@ -83,6 +90,8 @@ export default function Cadastro() {
       const resultado = await cadastrarCliente({
         nome: form.name.trim(),
         email,
+        senha: form.senha,
+        aceitouPrivacidade: form.aceitouPrivacidade,
       });
 
       // A conta já foi criada no banco.
@@ -99,7 +108,7 @@ export default function Cadastro() {
         state: {
           email:
             resultado.usuario?.email || email,
-          codigoEnviado: resultado.codigoEnviado,
+          linkEnviado: resultado.linkEnviado,
           origem: "cadastro",
         },
       });
@@ -129,9 +138,107 @@ export default function Cadastro() {
 
   if (autenticado) {
     return (
-      <Navigate to="/perfil" replace />
+      <Navigate to="/loja" replace />
     );
   }
+
+  const content = (<>
+          {!embedded && <header>
+            <h2 className="font-display text-[30px] font-semibold leading-tight">
+              Crie sua conta
+            </h2>
+
+            <p className="mt-3 text-sm text-muted">
+              É rapidinho! Preencha seus dados
+              para começar.
+            </p>
+          </header>}
+
+          <form
+            onSubmit={handleSubmit}
+            className={embedded ? "" : "mt-7"}
+          >
+            <div className="space-y-[15px]">
+              <FormField
+                id="name"
+                label="Nome completo"
+                placeholder="Como podemos chamar você?"
+                value={form.name}
+                onChange={(event) =>
+                  updateField(
+                    "name",
+                    event.target.value
+                  )
+                }
+                autoComplete="name"
+                disabled={
+                  submitting || registered
+                }
+              />
+
+              <FormField
+                id="email"
+                label="E-mail"
+                type="email"
+                placeholder="voce@email.com"
+                value={form.email}
+                onChange={(event) =>
+                  updateField(
+                    "email",
+                    event.target.value
+                  )
+                }
+                autoComplete="email"
+                disabled={
+                  submitting || registered
+                }
+              />
+
+              <PasswordField id="cadastro-senha" value={form.senha} onChange={event => updateField("senha", event.target.value)} disabled={submitting || registered} autoComplete="new-password" />
+            </div>
+            <PrivacyConsent checked={form.aceitouPrivacidade} onChange={event => updateField("aceitouPrivacidade", event.target.checked)} disabled={submitting || registered} />
+
+
+
+            <button
+              type="submit"
+              disabled={
+                submitting || registered
+              }
+              className="mt-6 flex h-[46px] w-full items-center justify-center rounded-[11px] bg-terracotta px-4 text-sm font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {submitting
+                ? "Cadastrando..."
+                : registered
+                  ? "Cadastro concluído"
+                  : "Verificar e-mail"}
+            </button>
+
+            {message && (
+              <div
+                role="alert"
+                aria-live="polite"
+                className="mt-4 rounded-lg border border-terracotta bg-[#fae7de] p-3 text-sm text-slatebrand"
+              >
+                {message}
+              </div>
+            )}
+          </form>
+
+          <p className="mt-6 text-xs leading-5 text-muted">
+            Após criar sua conta, enviaremos
+            um link de verificação para
+            seu e-mail. A confirmação será
+            necessária antes do primeiro acesso.
+          </p>
+
+          <p className="mt-20 text-[11px] leading-5 text-muted">
+            Seus dados são protegidos e utilizados
+            conforme nossa política de privacidade.
+          </p>
+  </>);
+
+  if (embedded) return content;
 
   return (
     <main className="grid min-h-screen bg-sand text-slatebrand lg:grid-cols-[minmax(0,38.8889fr)_minmax(0,61.1111fr)]">
@@ -170,128 +277,7 @@ export default function Cadastro() {
       {/* Painel direito */}
       <section className="flex min-w-0 items-center justify-center px-5 py-12 sm:px-10 lg:px-[60px]">
         <div className="w-full max-w-[560px]">
-          <header>
-            <h2 className="font-display text-[30px] font-semibold leading-tight">
-              Crie sua conta
-            </h2>
-
-            <p className="mt-3 text-sm text-muted">
-              É rapidinho! Preencha seus dados
-              para começar.
-            </p>
-          </header>
-
-          <div className="mt-11">
-            <p className="text-[13px] font-semibold text-terracotta">
-              01&nbsp; Seus dados
-            </p>
-
-            <div
-              aria-hidden="true"
-              className="mt-4 h-1 overflow-hidden rounded-full bg-[#e6e2d4]"
-            >
-              <div className="h-full w-[32%] rounded-full bg-terracotta" />
-            </div>
-          </div>
-
-          <form
-            onSubmit={handleSubmit}
-            className="mt-7"
-          >
-            <div className="space-y-[15px]">
-              <FormField
-                id="name"
-                label="Nome completo"
-                placeholder="Como podemos chamar você?"
-                value={form.name}
-                onChange={(event) =>
-                  updateField(
-                    "name",
-                    event.target.value
-                  )
-                }
-                autoComplete="name"
-                disabled={
-                  submitting || registered
-                }
-              />
-
-              <FormField
-                id="email"
-                label="E-mail"
-                type="email"
-                placeholder="voce@email.com"
-                value={form.email}
-                onChange={(event) =>
-                  updateField(
-                    "email",
-                    event.target.value
-                  )
-                }
-                autoComplete="email"
-                disabled={
-                  submitting || registered
-                }
-              />
-
-
-
-
-
-
-            </div>
-
-
-
-            <button
-              type="submit"
-              disabled={
-                submitting || registered
-              }
-              className="mt-6 flex h-[46px] w-full items-center justify-center rounded-[11px] bg-terracotta px-4 text-sm font-semibold text-white transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {submitting
-                ? "Cadastrando..."
-                : registered
-                  ? "Cadastro concluído"
-                  : "Verificar e-mail"}
-            </button>
-
-            {message && (
-              <div
-                role="alert"
-                aria-live="polite"
-                className="mt-4 rounded-lg border border-terracotta bg-[#fae7de] p-3 text-sm text-slatebrand"
-              >
-                {message}
-              </div>
-            )}
-          </form>
-
-          <p className="mt-6 text-xs leading-5 text-muted">
-            Após criar sua conta, enviaremos
-            um código de verificação para
-            seu e-mail. A confirmação será
-            necessária antes do primeiro acesso.
-          </p>
-
-          <div className="mt-11 flex flex-wrap items-center gap-x-6 gap-y-2 text-[13px]">
-            <span className="text-muted">
-              Já tem cadastro?
-            </span>
-
-            <Link
-              to="/"
-              className="font-semibold text-terracotta hover:underline"
-            >
-              Entrar na minha conta
-            </Link>
-          </div>
-
-          <p className="mt-20 text-[11px] leading-5 text-muted">
-            Seus dados são protegidos e utilizados
-            conforme nossa política de privacidade.
-          </p>
+          {content}
         </div>
       </section>
     </main>
