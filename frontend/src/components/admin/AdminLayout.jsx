@@ -1,6 +1,8 @@
+import ErrorBoundary from "../ErrorBoundary.jsx";
 import BrandLogo from "../brand/BrandLogo.jsx";
 
 import { useState } from "react";
+import { useAuth } from "../../contexts/AuthContext.jsx";
 import {
   Link,
   NavLink,
@@ -15,7 +17,6 @@ const menu = [
   { label: "Pedidos", path: "pedidos", icon: "▣" },
   { label: "Vendas", path: "vendas", icon: "◫" },
   { label: "Clientes", path: "clientes", icon: "♙" },
-  { label: "Relatórios", path: "relatorios", icon: "◷" },
   { label: "Configurações", path: "configuracoes", icon: "⚙" },
 ];
 
@@ -26,13 +27,13 @@ const titles = {
   pedidos: "Pedidos",
   vendas: "Vendas",
   clientes: "Clientes",
-  relatorios: "Relatórios",
   configuracoes: "Configurações",
 };
 
 export default function AdminLayout({
   preview = false,
 }) {
+  const { usuario } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
 
@@ -139,7 +140,7 @@ export default function AdminLayout({
           <div className="flex shrink-0 items-center gap-3">
             <div className="hidden text-right sm:block">
               <p className="text-sm font-semibold">
-                {preview ? "Pré-visualização" : "Administrador"}
+                {preview ? "Pré-visualização" : usuario?.nome || "Administrador"}
               </p>
 
               <p className="text-xs text-[#81849a]">
@@ -164,7 +165,7 @@ export default function AdminLayout({
         )}
 
         <main className="mx-auto max-w-[1600px] px-4 py-7 sm:px-8">
-          <Outlet context={{ preview }} />
+          <ErrorBoundary compact key={location.pathname}><Outlet context={{ preview }} /></ErrorBoundary>
         </main>
 
         <footer className="px-5 pb-7 text-xs text-[#85879a] sm:px-8">
