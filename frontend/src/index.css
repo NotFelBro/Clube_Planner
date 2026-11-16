@@ -57,16 +57,17 @@ a {
 /* Camadas decorativas independentes: o conteúdo permanece imóvel e clicável. */
 .wallpaper-blue,
 .wallpaper-light {
-  color: #252831;
   position: relative;
   isolation: isolate;
 }
 
 .wallpaper-blue {
+  color: #fff9e8;
   overflow: hidden;
 }
 
 .wallpaper-light {
+  color: #252831;
   /* Limita a camada fixa ao conteúdo, sem cobrir o cabeçalho ou o rodapé. */
   clip-path: inset(0);
 }
