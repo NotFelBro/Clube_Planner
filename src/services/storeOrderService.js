@@ -67,12 +67,13 @@ async function criarPedido(userId, dados = {}) {
       if (enderecoEntrega.cep !== frete.cep) throw new AuthError("O endereço mudou. Recalcule o frete antes de confirmar.", 409);
       await inventory.reservar(linhas, session);
       const gratuito = total === 0;
-      const [pedido] = await Order.create([{ ...filtro, checkoutRequestFingerprint: fingerprint, enderecoOrigemId: enderecoId,
+      const criadoEm = new Date();
+      const [pedido] = await Order.create([{ ...filtro, createdAt: criadoEm, checkoutRequestFingerprint: fingerprint, enderecoOrigemId: enderecoId,
         estoqueControlado: true, estoqueStatus: "reservado",
         ambienteTeste: true, pagamentoTipo: gratuito ? "gratuito" : "mercado_pago", pagamentoStatus: gratuito ? "dispensado" : "pendente",
         itens: linhas, enderecoEntrega, subtotalCentavos: subtotal, totalCentavos: total, freteCentavos: frete.valorCentavos, freteSnapshot: frete, descontoCentavos: desconto,
         status: gratuito ? "pago" : "aguardando_pagamento", pagoEm: gratuito ? new Date() : null,
-        reserva: { status: gratuito ? "consumido" : "reservado", expiresAt: new Date(Date.now() + 14 * 60000) },
+        reserva: { status: gratuito ? "consumido" : "reservado", expiresAt: new Date(criadoEm.getTime() + 15 * 60000) },
       }], { session });
       if (gratuito) { await inventory.movimentar(pedido, "consumir", session); await pedido.save({ session }); }
       await Event.create([{ actorId: userId, acao: "pedido.criacao", entidadeId: String(pedido._id), descricao: "Pedido recebido pela loja" }], { session });
