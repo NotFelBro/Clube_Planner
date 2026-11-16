@@ -10,11 +10,12 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "test": "vitest run",
+    "test": "node scripts/run-tests.mjs",
     "test:watch": "vitest",
     "dev:manual": "node --watch src/server.manual.js",
     "checkout:check": "node scripts/check-mercado-pago.cjs",
-    "checkout:preview": "node scripts/preview-checkout.cjs"
+    "checkout:preview": "node scripts/preview-checkout.cjs",
+    "deploy:check": "node scripts/check-deploy.mjs"
   },
   "repository": {
     "type": "git",
