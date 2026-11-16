@@ -22,19 +22,25 @@ import OrderDetails from "../pages/store/OrderDetails.jsx";
 import Colecoes from "../pages/store/Colecoes.jsx";
 
 // Autenticação
+import RecuperarSenha from "../pages/auth/RecuperarSenha.jsx";
+import ConfirmarAlteracaoEmail from "../pages/auth/ConfirmarAlteracaoEmail.jsx";
 import Login from "../pages/auth/Login.jsx";
-import Cadastro from "../pages/auth/Cadastro.jsx";
 import VerificarEmail from "../pages/auth/VerificarEmail.jsx";
+import ConfirmarEmail from "../pages/auth/ConfirmarEmail.jsx";
 
 // Perfil do cliente
 import MyProfile from "../pages/account/MyProfile.jsx";
 
 // Páginas administrativas
 import AdminSection from "../pages/admin/AdminSection.jsx";
+import ProductCatalog from "../pages/admin/ProductCatalog.jsx";
 
 export default function AppRoutes() {
   return (
     <Routes>
+      <Route path="/confirmar-alteracao-email" element={<ConfirmarAlteracaoEmail />} />
+      <Route path="/recuperar-senha" element={<RecuperarSenha key="solicitar" />} />
+      <Route path="/redefinir-senha" element={<RecuperarSenha key="redefinir" redefinir />} />
       {/* =====================================
           AUTENTICAÇÃO
       ===================================== */}
@@ -51,13 +57,18 @@ export default function AppRoutes() {
 
       <Route
         path="/cadastro"
-        element={<Cadastro />}
+        element={<Login initialMode="cadastro" />}
       />
 
       <Route
         path="/verificar-email"
         element={<VerificarEmail />}
       />
+
+      <Route
+  path="/confirmar-email"
+  element={<ConfirmarEmail />}
+/>
 
       {/* =====================================
           PAINEL ADMINISTRATIVO - DEMONSTRAÇÃO
@@ -109,12 +120,7 @@ export default function AppRoutes() {
           }
         />
 
-        <Route
-          path="relatorios"
-          element={
-            <AdminSection section="relatorios" />
-          }
-        />
+        <Route path="relatorios" element={<Navigate to="/admin-demo" replace />} />
 
         <Route
           path="configuracoes"
@@ -128,15 +134,13 @@ export default function AppRoutes() {
           ADMINISTRATIVO - ACESSO PROTEGIDO
       ===================================== */}
 
-      <Route
-        path="/admin"
-        element={<AdminAccess />}
-      />
-
-      <Route
-        path="/admin/*"
-        element={<AdminAccess />}
-      />
+      <Route path="/admin" element={<AdminAccess />}>
+        <Route index element={<AdminSection section="dashboard" />} />
+        <Route path="produtos" element={<ProductCatalog />} />
+        <Route path="categorias" element={<ProductCatalog categoriesOnly />} />
+        <Route path="relatorios" element={<Navigate to="/admin" replace />} />
+        <Route path=":section" element={<AdminSection />} />
+      </Route>
 
       {/* =====================================
           LOJA E PERFIL
