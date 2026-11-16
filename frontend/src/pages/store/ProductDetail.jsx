@@ -12,34 +12,8 @@ import {
 } from "../../data/products.js";
 
 function ProductIllustration({ product, view = 0 }) {
-  return (
-    <div
-      className="flex h-full w-full items-center justify-center rounded-xl"
-      style={{
-        backgroundColor:
-          view === 0
-            ? "#FCF8F5"
-            : product.background || "#E8F1E8",
-      }}
-    >
-      <div
-        className="flex aspect-[3/4] w-[45%] max-w-[190px] flex-col items-center justify-center rounded-xl shadow-md transition-transform"
-        style={{
-          backgroundColor: product.color || "#81B29A",
-          transform: `rotate(${
-            view === 1 ? -7 : view === 2 ? 7 : 0
-          }deg)`,
-        }}
-      >
-        <span className="text-center text-lg font-bold text-white">
-          {product.illustration || "CLUBE"}
-        </span>
-        <span className="mt-2 text-center text-xs text-white">
-          {product.illustrationSubtitle || "PLANNER"}
-        </span>
-      </div>
-    </div>
-  );
+  const image = product.images?.[view];
+  return <img src={image?.src || product.image} alt={image?.alt || product.name} decoding="async" className="h-full w-full rounded-xl object-contain" />;
 }
 
 export default function ProductDetail() {
@@ -101,8 +75,7 @@ function ProductDetailContent({ id }) {
   }
 
   function handleBuyNow() {
-    addSelectedQuantity();
-    navigate("/checkout");
+    navigate(`/checkout?produto=${product.id}&quantidade=${quantity}`);
   }
 
   const actionButton =
@@ -140,15 +113,15 @@ function ProductDetailContent({ id }) {
               />
             </div>
 
-            <div className="mt-4 flex gap-3">
-              {[0, 1, 2].map((view) => (
+            <div className="mt-4 flex flex-wrap gap-3">
+              {(product.images || [{ src: product.image, alt: product.name }]).map((image, view) => (
                 <button
                   key={view}
                   type="button"
-                  aria-label={`Visualização ${view + 1}`}
+                  aria-label={`Ver ${image.alt}`}
                   aria-pressed={selectedView === view}
                   onClick={() => setSelectedView(view)}
-                  className={`h-20 w-20 overflow-hidden rounded-xl border-2 ${
+                  className={`h-20 w-20 shrink-0 overflow-hidden rounded-xl border-2 ${
                     selectedView === view
                       ? "border-terracotta"
                       : "border-transparent"
@@ -198,6 +171,7 @@ function ProductDetailContent({ id }) {
                 </span>
               )}
 
+          {product.shippingCouponLevel && <span className="rounded-md bg-softsage px-2 py-1 text-[10px] font-semibold text-slatebrand">Frete grátis · FRETE{product.shippingCouponLevel} · nível {product.shippingCouponLevel}</span>}
               {product.coupon && (
                 <span className="rounded bg-sage px-2 py-1 text-xs font-bold text-white">
                   CUPOM
@@ -205,14 +179,12 @@ function ProductDetailContent({ id }) {
               )}
             </div>
 
-            <p className="mt-3 text-xs text-muted">
-              Valor ilustrativo do catálogo.
-            </p>
+            {product.originalPrice > product.price && <p className="mt-3 text-sm text-muted">De <del>{formatPrice(product.originalPrice)}</del> · Economia de {formatPrice(product.originalPrice - product.price)}</p>}
 
             <p className="mt-6 text-sm">
               Disponibilidade:{" "}
               {product.stock == null
-                ? "exemplar de teste"
+                ? "Consulte disponibilidade"
                 : product.stock > 0
                   ? `${product.stock} unidades`
                   : "indisponível"}
@@ -244,7 +216,7 @@ function ProductDetailContent({ id }) {
               <button
                 type="button"
                 aria-label="Aumentar quantidade"
-                disabled={quantity >= 99}
+                disabled={quantity >= Math.min(99, product.stock ?? 99)}
                 onClick={() =>
                   setQuantity((value) =>
                     Math.min(99, value + 1)
@@ -259,14 +231,16 @@ function ProductDetailContent({ id }) {
             <div className="mt-7 grid gap-3 sm:grid-cols-2">
               <button
                 type="button"
+                disabled={product.stock === 0 || quantity > product.stock}
                 onClick={handleBuyNow}
                 className={`${actionButton} border-terracotta bg-terracotta text-white hover:brightness-95`}
               >
-                Comprar agora
+                {product.stock === 0 ? "Esgotado" : "Comprar agora"}
               </button>
 
               <button
                 type="button"
+                disabled={product.stock === 0 || quantity > product.stock}
                 onClick={handleAddToCart}
                 className={`${actionButton} ${
                   added
