@@ -1,3 +1,5 @@
+import PasswordField from "../../components/auth/PasswordField.jsx";
+import Cadastro from "./Cadastro.jsx";
 import { loginSlides } from "../../data/loginSlides.js";
 import LoginCarousel from "../../components/auth/LoginCarousel.jsx";
 import BrandLogo from "../../components/brand/BrandLogo.jsx";
@@ -13,29 +15,13 @@ import {
 
 import { useAuth } from "../../contexts/AuthContext.jsx";
 
-export default function Login() {
+export default function Login({ initialMode = "entrar" }) {
+  const [mode, setMode] = useState(initialMode);
+  const creatingAccount = mode === "cadastro";
   const navigate = useNavigate();
   const location = useLocation();
 
-  const origem = location.state?.from;
-
-  const destino =
-    typeof origem?.pathname === "string" &&
-    origem.pathname.startsWith("/") &&
-    !origem.pathname.startsWith("//") &&
-    !origem.pathname.startsWith("/\\")
-      ? {
-          pathname: origem.pathname,
-          search:
-            typeof origem.search === "string"
-              ? origem.search
-              : "",
-          hash:
-            typeof origem.hash === "string"
-              ? origem.hash
-              : "",
-        }
-      : "/perfil";
+  const destino = "/loja";
 
   const {
     entrar,
@@ -49,6 +35,7 @@ export default function Login() {
       : ""
   );
 
+  const [senha, setSenha] = useState("");
   const [notice, setNotice] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -75,7 +62,7 @@ export default function Login() {
     setNotice("");
 
     try {
-      const usuario = await entrar(identificador);
+      const usuario = await entrar(identificador, senha);
       if (usuario) navigate(destino, { replace: true });
     } catch (error) {
       const mensagem =
@@ -146,6 +133,12 @@ export default function Login() {
 
       <section className="flex min-w-0 items-center justify-center px-5 py-12 sm:px-10 lg:px-12">
         <div className="w-full max-w-[600px]">
+          {creatingAccount ? (
+            <header>
+              <h2 className="font-display text-[30px] font-semibold">Crie sua conta</h2>
+              <p className="mt-2 text-sm text-muted">É rapidinho! Preencha seus dados para começar.</p>
+            </header>
+          ) : (<>
           <h2 className="font-display text-[30px] font-semibold">
             Acesse sua conta
           </h2>
@@ -162,24 +155,34 @@ export default function Login() {
               className="mt-6 rounded-lg border border-sage bg-[#e8f1e8] p-4 text-sm text-slatebrand"
             >
               Seu e-mail foi confirmado!
-              Informe seu e-mail para acessar
+              Informe seu e-mail e senha para acessar
               sua conta.
             </div>
           )}
 
-          <div className="mt-12 flex gap-9 border-b border-[#e6e2d4]">
-            <span className="border-b-[3px] border-terracotta pb-3 text-base font-semibold">
-              Entrar
-            </span>
+          </>)}
 
-            <Link
-              to="/cadastro"
-              className="pb-3 text-base font-medium text-muted transition hover:text-terracotta"
-            >
-              Criar conta
-            </Link>
+          <div className="mt-12 flex gap-9 border-b border-[#e6e2d4]" role="group" aria-label="Acesso à conta">
+            {[
+              ["entrar", "Entrar"],
+              ["cadastro", "Criar conta"],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={mode === value}
+                disabled={submitting}
+                onClick={() => { setMode(value); setNotice(""); }}
+                className={`border-b-[3px] pb-3 text-base transition ${mode === value ? "border-terracotta font-semibold" : "border-transparent font-medium text-muted hover:text-terracotta"}`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
 
+          {creatingAccount ? (
+            <div className="mt-6"><Cadastro embedded /></div>
+          ) : (<>
           <form
             onSubmit={handleSubmit}
             className="mt-6"
@@ -207,6 +210,9 @@ export default function Login() {
                 className="h-[46px] w-full rounded-[10px] border-[1.5px] border-[#b8b2a6] bg-white px-3 text-sm text-slatebrand placeholder:text-muted disabled:cursor-not-allowed disabled:opacity-60"
               />
             </div>
+
+            <div className="mt-5"><PasswordField id="login-senha" value={senha} onChange={event => { setSenha(event.target.value); setNotice(""); }} disabled={submitting} /></div>
+            <Link to="/recuperar-senha" state={{ email: identifier }} className="mt-3 inline-block text-xs font-semibold text-terracotta underline">Redefinir minha senha</Link>
 
             <button
               type="submit"
@@ -241,12 +247,13 @@ export default function Login() {
 
           <p className="mt-8 text-[13px] text-muted">
             Ainda não tem cadastro?{" "}
-            <Link
-              to="/cadastro"
+            <button
+              type="button"
+              onClick={() => { setMode("cadastro"); setNotice(""); }}
               className="font-semibold text-terracotta hover:underline"
             >
               Criar minha conta
-            </Link>
+            </button>
           </p>
 
           <div className="mt-11 rounded-xl bg-[#e8f1e8] px-5 py-4">
@@ -265,6 +272,7 @@ export default function Login() {
             os Termos de Uso e a Política de
             Privacidade.
           </p>
+          </>)}
         </div>
       </section>
     </main>
