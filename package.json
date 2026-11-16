@@ -9,10 +9,12 @@
   },
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js",
+    "dev": "node --watch src/server.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "dev:manual": "nodemon src/server.manual.js"
+    "dev:manual": "node --watch src/server.manual.js",
+    "checkout:check": "node scripts/check-mercado-pago.cjs",
+    "checkout:preview": "node scripts/preview-checkout.cjs"
   },
   "repository": {
     "type": "git",
@@ -42,12 +44,11 @@
     "express-rate-limit": "^8.7.1",
     "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.3",
-    "mongoose": "^9.11.3",
+    "mongoose": "^9.12.1",
     "nodemailer": "^10.4.0"
   },
   "devDependencies": {
     "mongodb-memory-server": "^11.3.0",
-    "nodemon": "^3.1.14",
     "supertest": "^7.3.1",
     "vitest": "^5.0.5"
   }
