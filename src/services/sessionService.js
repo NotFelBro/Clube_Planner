@@ -52,7 +52,7 @@ function validarRefreshToken(refreshToken) {
   }
 }
 
-async function criarSessao({ userId, userAgent = "" }) {
+async function criarSessao({ userId, userAgent = "", credencialVersao }) {
   if (!mongoose.isObjectIdOrHexString(userId)) {
     throw new Error(
       "Identificador de usuário inválido."
@@ -64,11 +64,12 @@ async function criarSessao({ userId, userAgent = "" }) {
   const usuario = await User.findOne({
     _id: userId,
     ativo: true,
+    emailVerificado: true,
   })
-    .select("_id")
+    .select("_id credencialVersao")
     .lean();
 
-  if (!usuario) {
+  if (!usuario || (credencialVersao !== undefined && (usuario.credencialVersao ?? 0) !== credencialVersao)) {
     throw new Error(
       "Usuário inexistente ou inativo."
     );
@@ -92,6 +93,7 @@ async function criarSessao({ userId, userAgent = "" }) {
 
   await Session.create({
     _id: sessionId,
+    credencialVersao: usuario.credencialVersao ?? 0,
     userId: usuario._id,
     familyId,
     userAgent: String(userAgent).slice(0, 512),
@@ -136,11 +138,12 @@ async function renovarSessao({ refreshToken }) {
       const usuario = await User.findOne({
         _id: sessaoAtual.userId,
         ativo: true,
+        emailVerificado: true,
       })
-        .select("_id")
+        .select("_id credencialVersao")
         .session(transacao);
 
-      if (!usuario) {
+      if (!usuario || (sessaoAtual.credencialVersao ?? 0) !== (usuario.credencialVersao ?? 0)) {
         throw new SessionError();
       }
 
@@ -190,6 +193,7 @@ async function renovarSessao({ refreshToken }) {
         [
           {
             _id: novaSessionId,
+            credencialVersao: usuario.credencialVersao ?? 0,
             userId: usuario._id,
             familyId: sessaoAtual.familyId,
             userAgent: sessaoAtual.userAgent,
