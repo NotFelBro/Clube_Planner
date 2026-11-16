@@ -1,3 +1,4 @@
+import { fetchJson } from "./fetchJson.js";
 
 export class CadastroApiError extends Error {
   constructor(message, status = 0) {
@@ -11,9 +12,10 @@ const BASE_URL = "/api/v1/auth";
 
 async function requisitar(caminho, dados) {
   let response;
+  let payload;
 
   try {
-    response = await fetch(`${BASE_URL}${caminho}`, {
+    ({ response, payload } = await fetchJson(`${BASE_URL}${caminho}`, {
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -21,32 +23,22 @@ async function requisitar(caminho, dados) {
       },
       credentials: "include",
       body: JSON.stringify(dados),
-    });
-  } catch {
+    }));
+  } catch (error) {
     throw new CadastroApiError(
-      "Não foi possível conectar ao servidor. Verifique sua conexão."
-    );
-  }
-
-  let payload;
-
-  try {
-    payload = await response.json();
-  } catch {
-    throw new CadastroApiError(
-      "Resposta inesperada do servidor.",
-      response.status
+      error?.message && (error.name === "TimeoutError" || error.status) ? error.message : "Não foi possível conectar ao servidor. Verifique sua conexão.",
+      error?.status || 0
     );
   }
 
   if (!response.ok || payload?.success !== true) {
     const fallback =
       response.status === 409
-        ? "E-mail já cadastrado."
+        ? "Não foi possível concluir a solicitação."
         : response.status === 429
-          ? "Muitas tentativas. Aguarde alguns minutos e tente novamente."
+          ? "Muitas tentativas. Aguarde alguns minutos."
           : response.status === 503
-            ? "Serviço temporariamente indisponível. Tente novamente."
+            ? "Serviço temporariamente indisponível."
             : "Não foi possível concluir a operação.";
 
     throw new CadastroApiError(
@@ -61,7 +53,10 @@ async function requisitar(caminho, dados) {
 }
 
 export async function cadastrarCliente(dados) {
-  const payload = await requisitar("/register", dados);
+  const payload = await requisitar(
+    "/register",
+    dados
+  );
 
   if (!payload.data?.usuario) {
     throw new CadastroApiError(
@@ -71,12 +66,12 @@ export async function cadastrarCliente(dados) {
 
   return {
     usuario: payload.data.usuario,
-    codigoEnviado: payload.data.codigoEnviado === true,
+    linkEnviado: payload.data.linkEnviado === true,
     mensagem: payload.message,
   };
 }
 
-export async function solicitarCodigoEmail(email) {
+export async function solicitarLinkEmail(email) {
   const payload = await requisitar(
     "/send-verification",
     { email }
@@ -85,22 +80,28 @@ export async function solicitarCodigoEmail(email) {
   return {
     mensagem:
       payload.message ||
-      "Se o e-mail estiver elegível, um código será enviado.",
+      "Se a conta estiver elegível, enviaremos um link.",
   };
 }
 
-export async function confirmarCodigoEmail(email, codigo) {
+export async function confirmarLinkEmail(token) {
   const payload = await requisitar(
     "/verify-email",
-    {
-      email,
-      codigo,
-    }
+    { token }
   );
 
   return {
     mensagem:
       payload.message ||
       "E-mail confirmado com sucesso.",
+    sessaoCriada:
+      Boolean(payload.data?.accessToken),
   };
+}
+
+export async function solicitarSenha(email) {
+  return (await requisitar("/forgot-password", { email })).data;
+}
+export async function salvarSenha(dados) {
+  return (await requisitar("/reset-password", dados)).data;
 }
