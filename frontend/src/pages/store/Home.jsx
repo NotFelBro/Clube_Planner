@@ -12,32 +12,11 @@ import {
   formatPrice,
 } from "../../data/products.js";
 
-const categories = [
+const defaultCategories = [
   { id: "planners", name: "Planners & agendas" },
   { id: "cadernos", name: "Cadernos & blocos" },
   { id: "canetas", name: "Canetas & acessórios" },
 ];
-
-function PlannerIllustration({ compact = false }) {
-  return (
-    <div
-      aria-hidden="true"
-      className={`relative rounded-xl bg-white shadow-sm ${
-        compact
-          ? "h-[125px] w-[100px]"
-          : "h-[180px] w-[150px]"
-      }`}
-    >
-      <div className="absolute left-[12%] right-[12%] top-[12%] h-[6px] rounded bg-sage" />
-
-      <div className="absolute left-[12%] top-[26%] h-1 w-[60%] rounded bg-[#e6e2d4]" />
-
-      <div className="absolute left-[12%] top-[36%] h-1 w-[68%] rounded bg-[#e6e2d4]" />
-
-      <div className="absolute bottom-[15%] left-[12%] right-[12%] h-[30%] rounded-md bg-[#e8f1e8]" />
-    </div>
-  );
-}
 
 function ProductCard({ product, onAdd }) {
   return (
@@ -49,7 +28,7 @@ function ProductCard({ product, onAdd }) {
             product.background || "#E8F1E8",
         }}
       >
-        <PlannerIllustration compact />
+        <img src={product.image} alt={product.name} loading="lazy" decoding="async" className="h-full w-full rounded-xl object-contain" />
 
       </div>
 
@@ -67,12 +46,14 @@ function ProductCard({ product, onAdd }) {
             {formatPrice(product.price)}
           </span>
 
+          {product.originalPrice > product.price && <del className="text-xs text-muted">{formatPrice(product.originalPrice)}</del>}
           {product.discount > 0 && (
             <span className="rounded-md bg-terracotta px-2 py-1 text-[10px] font-semibold text-white">
               {product.discount}% off
             </span>
           )}
 
+          {product.shippingCouponLevel && <span className="rounded-md bg-softsage px-2 py-1 text-[10px] font-semibold text-slatebrand">Frete grátis · FRETE{product.shippingCouponLevel} · nível {product.shippingCouponLevel}</span>}
           {product.coupon && (
             <span className="rounded-md bg-sage px-2 py-1 text-[10px] font-semibold text-white">
               CUPOM
@@ -80,6 +61,7 @@ function ProductCard({ product, onAdd }) {
           )}
         </div>
 
+        {product.stock === 0 && <p className="mt-2 text-xs text-muted">Esgotado</p>}
         <div className="mt-auto flex gap-2 pt-4">
           <Link
             to={`/produto/${product.id}`}
@@ -91,6 +73,7 @@ function ProductCard({ product, onAdd }) {
 
           <button
             type="button"
+            disabled={product.stock === 0}
             onClick={() => onAdd(product)}
             aria-label={`Adicionar ${product.name} à sacola`}
             className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-[11px] bg-sage text-2xl font-semibold text-white transition hover:brightness-95"
@@ -106,10 +89,12 @@ function ProductCard({ product, onAdd }) {
 export default function Home() {
   const {
     products,
+    categories: storeCategories,
     search,
     addToCart,
   } = useStore();
 
+  const categories = Array.isArray(storeCategories) ? storeCategories : defaultCategories;
   const productsRef = useRef(null);
 
   const [searchParams, setSearchParams] =
