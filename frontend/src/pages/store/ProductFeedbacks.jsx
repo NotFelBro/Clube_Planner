@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
-import { getProductById } from "../../data/products.js";
+import { useStore } from "../../components/layout/StoreContext.js";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { shopApi } from "../../services/shopApi.js";
 
@@ -9,7 +9,8 @@ export default function ProductFeedbacks() {
   return <FeedbackContent key={id} id={id} />;
 }
 function FeedbackContent({ id }) {
-  const product = getProductById(id);
+  const { products } = useStore();
+  const product = products.find(p => p.id === Number(id));
   const { accessToken, autenticado } = useAuth();
   const [avaliacoes, setAvaliacoes] = useState([]);
   const [rating, setRating] = useState(0);
