@@ -88,8 +88,27 @@ const userSchema = new mongoose.Schema(
       required: true,
       lowercase: true,
       trim: true,
+      maxlength: 254,
+      match: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
     },
 
+    alteracaoEmail: {
+      novoEmail: { type: String, select: false, default: null },
+      emailAnterior: { type: String, select: false, default: null },
+      tokenHash: { type: String, select: false, default: null },
+      expiraEm: { type: Date, select: false, default: null },
+      ultimoEnvioEm: { type: Date, select: false, default: null },
+      credencialVersao: { type: Number, select: false, default: null },
+    },
+    credencialVersao: { type: Number, default: 0, min: 0 },
+    senhaHash: { type: String, select: false, default: null },
+    privacidadeAceitaEm: { type: Date, default: null },
+    privacidadeVersao: { type: String, default: null },
+    recuperacaoSenha: {
+      tokenHash: { type: String, select: false, default: null },
+      expiraEm: { type: Date, select: false, default: null },
+      ultimoEnvioEm: { type: Date, select: false, default: null },
+    },
     cpf: {
       type: String,
       trim: true,
@@ -174,8 +193,9 @@ userSchema.path("enderecos").validate(
   "O usuário deve possuir exatamente um endereço principal quando houver endereços cadastrados."
 );
 
-userSchema.index({ cpf: 1 }, { unique: true, partialFilterExpression: { cpf: { $type: "string" } } });
-userSchema.index({ email: 1 }, { unique: true });
+userSchema.statics.validarCPF = validarCPF;
+userSchema.index({ cpf: 1 }, { name: 'cpf_ativo_unico', unique: true, partialFilterExpression: { ativo: true, cpf: { $type: 'string' } } });
+userSchema.index({ email: 1 }, { name: 'email_ativo_unico', unique: true, partialFilterExpression: { ativo: true, email: { $type: 'string' } } });
 
 module.exports =
   mongoose.models.User ||
