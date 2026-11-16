@@ -1,5 +1,6 @@
 
 const User = require("../models/User");
+const { gerarHashSenha, validarSenha } = require("./passwordService");
 
 
 class AuthError extends Error {
@@ -52,6 +53,8 @@ function usuarioPerfil(usuario) {
   return {
     ...usuarioPublico(usuario),
     cpf: usuario.cpf,
+    emailPendente: usuario.alteracaoEmail?.expiraEm > new Date() ? usuario.alteracaoEmail.novoEmail : null,
+    emailPendenteExpiraEm: usuario.alteracaoEmail?.expiraEm > new Date() ? usuario.alteracaoEmail.expiraEm : null,
   };
 }
 
@@ -64,7 +67,9 @@ async function cadastrarUsuario(dados = {}) {
   );
 
   const email = normalizarEmail(dados.email);
-  const existente = await User.exists({ email });
+  validarSenha(dados.senha);
+  if (dados.aceitouPrivacidade !== true) throw new AuthError("Aceite os termos de privacidade para criar sua conta.");
+  const existente = await User.exists({ email, ativo: true });
   if (existente) throw new AuthError("E-mail já cadastrado. Entre na sua conta ou solicite um código.", 409);
 
   let usuario;
@@ -73,6 +78,9 @@ async function cadastrarUsuario(dados = {}) {
     usuario = await User.create({
       nome,
       email,
+      senhaHash: await gerarHashSenha(dados.senha),
+      privacidadeAceitaEm: new Date(),
+      privacidadeVersao: "2026-11-13",
       role: "client",
       ativo: true,
       emailVerificado: false,
@@ -109,7 +117,7 @@ async function atualizarDadosPessoais(userId, dados) {
     );
   }
 
-  const camposPermitidos = ["nome"];
+  const camposPermitidos = ["nome", "cpf"];
   const camposRecebidos = Object.keys(dados);
 
   if (camposRecebidos.length === 0) {
@@ -124,7 +132,7 @@ async function atualizarDadosPessoais(userId, dados) {
 
   if (camposInvalidos.length > 0) {
     throw new AuthError(
-      "Apenas o nome pode ser alterado por esta operação."
+      "Apenas nome e CPF podem ser alterados diretamente. O e-mail exige confirmação separada."
     );
   }
 
@@ -139,6 +147,13 @@ async function atualizarDadosPessoais(userId, dados) {
     );
   }
 
+  const remover = {};
+  if (Object.hasOwn(dados, 'cpf')) {
+    if (typeof dados.cpf !== 'string' || dados.cpf.length > 32 || !/^[\d.\-\s]*$/.test(dados.cpf)) throw new AuthError('CPF inválido.');
+    const cpf = dados.cpf.replace(/\D/g, '');
+    if (!cpf) remover.cpf = '';
+    else { if (!User.validarCPF(cpf)) throw new AuthError('CPF inválido.'); alteracoes.cpf = cpf; }
+  }
   let usuario;
 
   try {
@@ -149,13 +164,15 @@ async function atualizarDadosPessoais(userId, dados) {
       },
       {
         $set: alteracoes,
+        ...(Object.keys(remover).length ? { $unset: remover } : {}),
       },
       {
-        new: true,
+        returnDocument: "after",
         runValidators: true,
       }
-    );
+    ).select("+alteracaoEmail.novoEmail +alteracaoEmail.expiraEm");
   } catch (erro) {
+    if (erro.code === 11000) throw new AuthError("CPF já cadastrado em outra conta ativa.", 409);
     if (erro.name === "ValidationError") {
       throw new AuthError(
         "Dados de atualização inválidos."
@@ -179,4 +196,6 @@ module.exports = {
   AuthError,
   cadastrarUsuario,
   atualizarDadosPessoais,
+  normalizarEmail,
+  usuarioPerfil,
 };
