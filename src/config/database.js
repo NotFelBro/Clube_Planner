@@ -1,10 +1,12 @@
 
 const mongoose = require("mongoose");
+let conexaoPendente;
 
 /**
  * Estabelece a conexão com o MongoDB.
  */
 const connectDB = async () => {
+  if (mongoose.connection.readyState === 1) return;
   const mongoURI = process.env.MONGODB_URI;
 
   if (!mongoURI) {
@@ -13,11 +15,15 @@ const connectDB = async () => {
     );
   }
 
-  await mongoose.connect(mongoURI, {
-    serverSelectionTimeoutMS: 5000,
-  });
-
-  console.log("MongoDB conectado com sucesso.");
+  if (!conexaoPendente) {
+    conexaoPendente = mongoose.connect(mongoURI, {
+      serverSelectionTimeoutMS: 5000,
+      maxPoolSize: 5,
+      minPoolSize: 0,
+      maxIdleTimeMS: 60000,
+    }).finally(() => { conexaoPendente = undefined; });
+  }
+  await conexaoPendente;
 };
 
 /**
