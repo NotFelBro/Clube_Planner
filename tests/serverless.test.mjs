@@ -63,6 +63,21 @@ describe('entrada da API na Vercel', () => {
     expect(conciliar).not.toHaveBeenCalled();
   });
 
+  it.each([
+    [18, 'autenticacao_banco'], [13, 'permissao_banco'],
+    [85, 'opcoes_indice'], [86, 'definicao_indice'],
+    [8000, 'autenticacao_banco'],
+  ])('registra apenas código e categoria do MongoDB: %s', async (codigo, diagnostico) => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const erro = Object.assign(new Error('bad auth: mongodb://usuario:senha@privado dados_cliente'), { name: 'MongoServerError', code: codigo });
+    const { api } = servidor({ inicializar: vi.fn().mockRejectedValue(erro) });
+    const resposta = await api('/api/v1/health');
+    expect(resposta.status).toBe(503);
+    expect(JSON.parse(log.mock.calls[0][0])).toMatchObject({ codigo, diagnostico, tipo: 'MongoServerError' });
+    expect(JSON.stringify(log.mock.calls)).not.toMatch(/senha|privado|dados_cliente|mongodb:\/\//);
+    expect(JSON.stringify(resposta.body)).not.toMatch(/codigo|diagnostico|senha/);
+  });
+
   it('compartilha a limpeza concorrente e só repete após um minuto', async () => {
     let tempo = 0;
     let liberar;
