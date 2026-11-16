@@ -17,6 +17,9 @@ export default function ShoppingCart() {
     clearCart,
   } = useStore();
 
+  const originalSubtotal = cart.reduce((sum, p) => sum + Math.round((p.originalPrice ?? p.price) * 100), 0) / 100;
+  const desconto = originalSubtotal - cartSubtotal;
+
   const items = useMemo(() => {
     const grouped = new Map();
 
@@ -101,18 +104,7 @@ export default function ShoppingCart() {
                           product.background || "#E8F1E8",
                       }}
                     >
-                      <div
-                        className="flex h-20 w-14 flex-col items-center justify-center rounded-lg text-center text-[9px] font-bold text-white"
-                        style={{
-                          backgroundColor:
-                            product.color || "#81B29A",
-                        }}
-                      >
-                        {product.illustration || "CLUBE"}
-                        <span className="mt-1 text-[7px] font-normal">
-                          {product.illustrationSubtitle}
-                        </span>
-                      </div>
+                      <img src={product.image} alt={product.name} loading="lazy" decoding="async" className="h-full w-full rounded-xl object-contain" />
                     </div>
 
                     <div className="min-w-0 flex-1">
@@ -205,7 +197,7 @@ export default function ShoppingCart() {
                   <span className="text-muted">
                     Produtos ({cartCount})
                   </span>
-                  <span>{formatPrice(cartSubtotal)}</span>
+                  <span>{formatPrice(originalSubtotal)}</span>
                 </div>
 
                 <div className="flex justify-between gap-4">
@@ -215,7 +207,7 @@ export default function ShoppingCart() {
 
                 <div className="flex justify-between gap-4">
                   <span className="text-muted">Descontos</span>
-                  <span>R$ 0,00</span>
+                  <span>{formatPrice(desconto)}</span>
                 </div>
               </div>
 
@@ -245,16 +237,8 @@ export default function ShoppingCart() {
 
               <button
                 type="button"
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      "Deseja esvaziar a sacola?"
-                    )
-                  ) {
-                    clearCart();
-                  }
-                }}
-                className="mt-5 w-full text-center text-xs text-muted hover:text-red-600"
+                onClick={clearCart}
+                className="mt-5 min-h-12 w-full cursor-pointer rounded-xl border border-red-500/20 bg-transparent px-4 text-center text-xs text-red-600 transition-colors hover:border-red-500/40 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-400"
               >
                 Esvaziar sacola
               </button>
