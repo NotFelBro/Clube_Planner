@@ -87,10 +87,10 @@ export function AuthProvider({ children }) {
     setUsuario(null);
   }, []);
 
-  const entrar = useCallback(async (email) => {
+  const entrar = useCallback(async (email, senha) => {
     if (logoutPendenteRef.current) await logoutPendenteRef.current;
     const geracao = ++geracaoRef.current;
-    const dados = await autenticarCliente(email);
+    const dados = await autenticarCliente(email, senha);
     if (geracao !== geracaoRef.current || !montadoRef.current) return null;
     atualizarSessao(dados);
     setCarregando(false);
@@ -189,7 +189,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   const atualizarPerfil = useCallback(async ({
-    nome,
+    nome, cpf,
   }) => {
     const token = tokenRef.current;
 
@@ -202,9 +202,7 @@ export function AuthProvider({ children }) {
     const geracao = geracaoRef.current;
     const revisao = ++revisaoPerfilRef.current;
 
-    const dados = await atualizarMeuPerfil(token, {
-      nome,
-      });
+    const dados = await atualizarMeuPerfil(token, { nome, ...(cpf !== undefined ? { cpf } : {}) });
 
     if (
       geracao !== geracaoRef.current ||
