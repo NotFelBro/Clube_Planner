@@ -217,6 +217,10 @@ const couponSnapshotSchema = new Schema({
 });
 
 const orderSchema = new Schema({
+  estoqueControlado: { type: Boolean, default: false, immutable: true },
+  estoqueRetornoPendente: { type: Boolean, default: false },
+  estoqueStatus: { type: String, enum: ["reservado", "consumido", "liberado", null], default: null },
+  codigoRastreio: { type: String, maxlength: 100, default: "" },
   ambienteTeste: { type: Boolean, default: false, immutable: true },
   pagamentoTipo: { type: String, enum: ["gratuito", "mercado_pago", null], default: null },
   pagamentoStatus: { type: String, default: null },
@@ -224,7 +228,10 @@ const orderSchema = new Schema({
     type: new Schema({
       cep: { type: String, required: true },
       nivel: { type: Number, enum: [1, 2, 3], required: true },
-      valorCentavos: { type: Number, enum: [300, 600, 900], required: true },
+      valorCentavos: { type: Number, enum: [0, 300, 600, 900], required: true },
+      cupom: { type: String, enum: ["FRETE1", "FRETE2", "FRETE3"] },
+      valorOriginalCentavos: { type: Number, min: 0 },
+      descontoCentavos: { type: Number, min: 0 },
       distanciaKm: { type: Number, min: 0, required: true },
       metodo: { type: String, enum: ["linha_reta_entre_ceps"], required: true },
       origem: {
@@ -351,6 +358,9 @@ const orderSchema = new Schema({
     default: null
   },
 
+  cancelamentoOrigem: { type: String, enum: ['reserva_expirada', 'cliente'], default: null },
+  pagamentoConsultadoEm: { type: Date, default: null },
+  cancelamentoSolicitadoEm: { type: Date, default: null },
   canceladoEm: {
     type: Date,
     default: null
