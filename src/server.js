@@ -16,10 +16,10 @@ const startServer = async () => {
     await User.init();
     await require("./config/userIndexes").garantirIndicesUsuario(User.collection);
 
-    await Promise.all([require("./models/product").init(), require("./models/Category").init(), require("./models/catalogCounter").init(), require("./models/adminEvent").init(), require("./models/storeSettings").init()]);
+    await Promise.all([require("./models/product").init(), require("./models/Category").init(), require("./models/catalogCounter").init(), require("./models/adminEvent").init(), require("./models/storeSettings").init(), require("./models/order").init()]);
     await require("./services/catalogService").inicializarCatalogo({ estoqueInicial: 100 });
 
-    const server = app.listen(PORT, () => {
+    const server = app.listen(PORT, process.env.NODE_ENV === "production" ? "127.0.0.1" : "0.0.0.0", () => {
       console.log(
         `Servidor Clube Planner iniciado na porta ${PORT}.`
       );
