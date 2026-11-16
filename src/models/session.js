@@ -10,6 +10,7 @@ const sessionSchema = new mongoose.Schema(
       immutable: true,
     },
 
+    credencialVersao: { type: Number, default: 0, min: 0 },
     familyId: {
       type: mongoose.Schema.Types.ObjectId,
       required: true,
@@ -39,6 +40,7 @@ const sessionSchema = new mongoose.Schema(
         "rotation",
         "reuse_detected",
         "password_changed",
+        "email_changed",
         "session_limit",
         "admin_revocation",
         null,
