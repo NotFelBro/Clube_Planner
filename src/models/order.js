@@ -278,6 +278,7 @@ const orderSchema = new Schema({
 
   itens: {
     type: [orderItemSchema],
+    immutable: true,
     required: true,
     validate: {
       validator: itens =>
@@ -288,6 +289,7 @@ const orderSchema = new Schema({
 
   enderecoEntrega: {
     type: enderecoEntregaSchema,
+    immutable: true,
     required: true
   },
 
@@ -370,6 +372,35 @@ const orderSchema = new Schema({
   timestamps: true,
   versionKey: false
 });
+
+// Snapshots e valores financeiros não podem ser reescritos após o checkout.
+const snapshots = new Set(['itens', 'enderecoEntrega', 'subtotalCentavos',
+  'descontoCentavos', 'freteCentavos', 'totalCentavos', 'freteSnapshot', 'couponSnapshot']);
+const protegido = caminho => snapshots.has(caminho.split('.')[0]);
+const erroSnapshot = () => Object.assign(new Error('Os snapshots do pedido são imutáveis.'), { statusCode: 409 });
+for (const operacao of ['validate', 'save']) {
+  orderSchema.pre(operacao, function () {
+    if (!this.isNew && this.modifiedPaths().some(protegido)) throw erroSnapshot();
+  });
+}
+for (const operacao of ['updateOne', 'updateMany', 'findOneAndUpdate']) {
+  orderSchema.pre(operacao, function () {
+    const update = this.getUpdate() || {};
+    // Pipelines podem substituir o documento ou calcular caminhos dinamicamente.
+    if (Array.isArray(update)) throw erroSnapshot();
+    for (const [operador, campos] of Object.entries(update)) {
+      if (protegido(operador)) throw erroSnapshot();
+      if (operador.startsWith('$') && campos && typeof campos === 'object') {
+        if (Object.keys(campos).some(protegido) ||
+            (operador === '$rename' && Object.values(campos).some(c => typeof c === 'string' && protegido(c)))) throw erroSnapshot();
+      }
+    }
+  });
+}
+orderSchema.pre('bulkWrite', function () { throw erroSnapshot(); });
+for (const operacao of ['replaceOne', 'findOneAndReplace']) {
+  orderSchema.pre(operacao, function () { throw erroSnapshot(); });
+}
 
 orderSchema.pre("validate", function () {
   const valores = [
