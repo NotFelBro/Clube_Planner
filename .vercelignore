@@ -1,0 +1,9 @@
+.git/
+.env
+.env.*
+frontend/.env
+frontend/.env.*
+backup_rf01/
+coverage/
+tests/
+*.log
