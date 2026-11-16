@@ -1,3 +1,4 @@
+import { fetchJson } from "./fetchJson.js";
 
 const BASE_URL = "/api/v1/auth";
 
@@ -31,9 +32,10 @@ async function requisitar(
   }
 
   let response;
+  let payload;
 
   try {
-    response = await fetch(`${BASE_URL}${caminho}`, {
+    ({ response, payload } = await fetchJson(`${BASE_URL}${caminho}`, {
       method,
       headers,
       credentials: "include",
@@ -41,25 +43,15 @@ async function requisitar(
       ...(body !== undefined
         ? { body: JSON.stringify(body) }
         : {}),
-    });
+    }));
   } catch (error) {
     if (error?.name === "AbortError") {
       throw error;
     }
 
     throw new AuthApiError(
-      "Não foi possível conectar ao servidor. Verifique sua conexão."
-    );
-  }
-
-  let payload;
-
-  try {
-    payload = await response.json();
-  } catch {
-    throw new AuthApiError(
-      "O servidor retornou uma resposta inesperada.",
-      response.status
+      error?.message && (error.name === "TimeoutError" || error.status) ? error.message : "Não foi possível conectar ao servidor. Verifique sua conexão.",
+      error?.status || 0
     );
   }
 
@@ -84,8 +76,8 @@ async function requisitar(
   return payload.data ?? {};
 }
 
-export function autenticarCliente(email) {
-  return requisitar("/login", { method: "POST", body: { email } });
+export function autenticarCliente(email, senha) {
+  return requisitar("/login", { method: "POST", body: { email, senha } });
 }
 
 export async function renovarAutenticacao() {
@@ -131,4 +123,14 @@ export function listarDadosConta(recurso, accessToken) {
 }
 export function salvarDadosConta(recurso, accessToken, body) {
   return requisitar(`/${recurso}`, { method: "POST", accessToken, body });
+}
+
+export function solicitarAlteracaoEmail(accessToken, email, senhaAtual) {
+  return requisitar('/me/email-change', { method: 'POST', accessToken, body: { email, senhaAtual } });
+}
+export function cancelarAlteracaoEmail(accessToken) {
+  return requisitar('/me/email-change', { method: 'DELETE', accessToken });
+}
+export function confirmarAlteracaoEmail(token) {
+  return requisitar('/confirm-email-change', { method: 'POST', body: { token } });
 }
