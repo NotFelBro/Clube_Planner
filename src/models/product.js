@@ -3,6 +3,8 @@ const mongoose = require("mongoose");
 
 const variacaoSchema = new mongoose.Schema(
   {
+    lojaId: { type: Number, min: 1, validate: Number.isSafeInteger },
+    precoOriginalCentavos: { type: Number, min: 0, default: null, validate: v => v == null || Number.isSafeInteger(v) },
     sku: {
       type: String,
       required: true,
@@ -62,6 +64,7 @@ const variacaoSchema = new mongoose.Schema(
 
 const productSchema = new mongoose.Schema(
   {
+    shippingCouponLevel: { type: Number, enum: [1, 2, 3, null], default: null },
     nome: {
       type: String,
       required: true,
@@ -152,6 +155,13 @@ const productSchema = new mongoose.Schema(
     versionKey: false,
   }
 );
+
+productSchema.pre('save', async function () {
+  for (const variacao of this.variacoes) {
+    if (!variacao.lojaId) variacao.lojaId = await require('../services/catalogIdentityService').proximoId(this.$session());
+  }
+});
+productSchema.index({ 'variacoes.lojaId': 1 }, { unique: true, partialFilterExpression: { 'variacoes.lojaId': { $type: 'number' } } });
 
 // Identificador público do produto.
 productSchema.index(
