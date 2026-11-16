@@ -14,3 +14,14 @@ Evidências: `tests/userModel.test.mjs`, `tests/userIndexSecurity.test.mjs`,
 Os cartões externos não foram movidos. Há mudanças anteriores no diretório;
 nenhum commit foi criado nesta revisão. A execução local e seus testes não
 substituem a validação operacional de disponibilidade nem a homologação externa.
+
+## RF-10 e RNF-02 — complemento de 16/11/2026
+
+- RF-10: snapshots protegidos no modelo, prazo de reserva ajustado para 15 minutos
+  e índice de idempotência aguardado na inicialização. Testes de criação, concorrência,
+  rollback e preservação dos snapshots disponíveis. Pagamentos reais ficam para depois.
+- RNF-02: proxy Caddy com TLS 1.2/1.3, cabeçalhos para frontend/API, API restrita a
+  loopback em produção e verificador de deploy preparados. Homologação local não
+  substitui aplicação e validação no domínio público.
+
+Procedimento e limites: [validação RNF-02/RF-10](rnf02-rf10-validacao.md).
