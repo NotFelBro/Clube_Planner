@@ -6,11 +6,12 @@ const { validarOrigem } = require("../middlewares/validarOrigem");
 const { adicionarEndereco } = require("../services/addressService");
 const { AuthError } = require("../services/authService");
 const router = express.Router();
-const limitar = rateLimit({ windowMs: 60000, limit: 30, standardHeaders: "draft-8", legacyHeaders: false });
+const limitar = rateLimit({ windowMs: 60000, limit: 30, standardHeaders: "draft-8", legacyHeaders: false, message: { success: false, message: "Muitas solicitações de endereço. Aguarde um minuto." } });
 router.use(autenticar);
 router.get("/addresses", async (req, res, next) => {
   try {
     const usuario = await User.findById(req.auth.userId).select("enderecos").lean();
+    if (!usuario) throw new AuthError("Conta não encontrada ou inativa.", 401);
     res.json({ success: true, data: { enderecos: usuario.enderecos } });
   } catch (erro) { next(erro); }
 });
