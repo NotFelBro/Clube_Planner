@@ -93,3 +93,25 @@ describe('configuração de produção', () => {
     expect(() => config.validarConfiguracaoSegura({ ...env, FRONTEND_URL: 'http://loja.example' })).toThrow('HTTPS');
   });
 });
+
+describe('transporte em produção', () => {
+  const { configurarTransporte } = require('../src/config/transport');
+  function servidor(env) {
+    const teste = express();
+    configurarTransporte(teste, { NODE_ENV: env });
+    teste.get('/', (req, res) => res.json({ seguro: req.secure }));
+    return teste;
+  }
+  it('recusa HTTP direto e aceita HTTPS informado pelo proxy local', async () => {
+    const teste = servidor('production');
+    expect((await request(teste).get('/')).status).toBe(426);
+    const resposta = await request(teste).get('/').set('X-Forwarded-Proto', 'https');
+    expect(resposta.status).toBe(200);
+    expect(resposta.body.seguro).toBe(true);
+    expect((await request(teste).get('/').set('X-Forwarded-Proto', 'http')).status).toBe(426);
+    expect(teste.get('trust proxy fn')('203.0.113.1')).toBe(false);
+  });
+  it('mantém desenvolvimento local acessível por HTTP', async () => {
+    expect((await request(servidor('development')).get('/')).status).toBe(200);
+  });
+});
