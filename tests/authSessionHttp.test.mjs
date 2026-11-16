@@ -28,7 +28,7 @@ const emailService = require(
 );
 
 const enviarEmailOriginal =
-  emailService.enviarCodigoVerificacao;
+  emailService.enviarLinkVerificacao;
 
 
 const BASE = "/api/v1/auth";
@@ -127,6 +127,8 @@ function obterCookie(resposta) {
 async function criarUsuario() {
   const dados = {
     nome: "Cliente Sessão Teste",
+    senha: "senha-teste",
+    aceitouPrivacidade: true,
     email:
       `session-${randomUUID()}@example.com`,
   };
@@ -178,7 +180,7 @@ async function criarUsuario() {
 
 async function fazerLogin(dados, userAgent = "") {
   const resposta = await request(app).post(`${BASE}/login`)
-    .set("Origin", ORIGEM).set("User-Agent", userAgent).send({ email: dados.email });
+    .set("Origin", ORIGEM).set("User-Agent", userAgent).send({ email: dados.email, senha: dados.senha });
   expect(resposta.status).toBe(200);
   expect(resposta.body.data.accessToken).toBeTruthy();
   return resposta;
@@ -219,13 +221,13 @@ beforeAll(async () => {
 }, 30000);
 
 beforeEach(() => {
-  emailService.enviarCodigoVerificacao = vi
+  emailService.enviarLinkVerificacao = vi
     .fn()
     .mockResolvedValue(undefined);
 });
 
 afterEach(async () => {
-  emailService.enviarCodigoVerificacao =
+  emailService.enviarLinkVerificacao =
     enviarEmailOriginal;
 
   if (usuariosCriados.size === 0) {
@@ -259,7 +261,7 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
-  emailService.enviarCodigoVerificacao =
+  emailService.enviarLinkVerificacao =
     enviarEmailOriginal;
 
   await mongoose.disconnect();
@@ -287,9 +289,9 @@ describe("Autenticação — Sessões HTTP", () => {
     expect((await request(app).get(`${BASE}/addresses`)).status).toBe(401);
   });
 
-  it("remove as rotas de senha", async () => {
+  it("mantém alteração direta de senha indisponível", async () => {
     const { token } = await criarSessaoDeTeste();
-    for (const [method, path] of [["patch", "/password"], ["post", "/forgot-password"], ["post", "/reset-password"]]) {
+    for (const [method, path] of [["patch", "/password"]]) {
       const resposta = await request(app)[method](`${BASE}${path}`).set("Origin", ORIGEM).set("Authorization", `Bearer ${token}`).send({});
       expect(resposta.status).toBe(404);
     }
@@ -558,4 +560,12 @@ describe("Autenticação — Sessões HTTP", () => {
     expect(sucessos).toHaveLength(1);
     expect(rejeicoes).toHaveLength(1);
   });
+});
+it('limita o cadastro de endereços sem alterar os já salvos', async () => {
+  const { dados, token } = await criarSessaoDeTeste();
+  const endereco = { pais: 'Brasil', cep: '01001000', logradouro: 'Praça da Sé', numero: '10', bairro: 'Sé', cidade: 'São Paulo', estado: 'SP' };
+  await User.updateOne({ email: dados.email }, { $set: { enderecos: Array.from({ length: 20 }, (_, i) => ({ ...endereco, principal: i === 0 })) } });
+  const resposta = await request(app).post(`${BASE}/addresses`).set('Origin', ORIGEM).set('Authorization', `Bearer ${token}`).send(endereco);
+  expect(resposta.status).toBe(409);
+  expect((await User.findOne({ email: dados.email })).enderecos).toHaveLength(20);
 });
