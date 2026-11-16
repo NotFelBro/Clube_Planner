@@ -230,3 +230,10 @@ describe("Middleware de autorização", () => {
     expect(res.status).toHaveBeenCalledWith(401);
   });
 });
+
+it('rejeita sessão de uma versão anterior da senha', async () => {
+  User.findOne.mockReturnValue({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue({ _id: userId, role: 'client', credencialVersao: 1 }) }) });
+  await autenticar(req, res, next);
+  expect(res.status).toHaveBeenCalledWith(401);
+  expect(next).not.toHaveBeenCalled();
+});
