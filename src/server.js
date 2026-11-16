@@ -2,22 +2,14 @@
 require("dotenv").config();
 
 const app = require("./app");
-const { connectDB, disconnectDB } = require("./config/database");
+const { disconnectDB } = require("./config/database");
+const { inicializarAplicacao } = require("./config/bootstrap");
 
 const PORT = Number(process.env.PORT) || 3000;
 
 const startServer = async () => {
   try {
-    require("./config/security").validarConfiguracaoSegura();
-    const User = require("./models/User");
-    // A verificação explícita aceita nomes equivalentes e recusa índices inseguros.
-    User.schema.set("autoIndex", false);
-    await connectDB();
-    await User.init();
-    await require("./config/userIndexes").garantirIndicesUsuario(User.collection);
-
-    await Promise.all([require("./models/product").init(), require("./models/Category").init(), require("./models/catalogCounter").init(), require("./models/adminEvent").init(), require("./models/storeSettings").init(), require("./models/order").init()]);
-    await require("./services/catalogService").inicializarCatalogo({ estoqueInicial: 100 });
+    await inicializarAplicacao();
 
     const server = app.listen(PORT, process.env.NODE_ENV === "production" ? "127.0.0.1" : "0.0.0.0", () => {
       console.log(
