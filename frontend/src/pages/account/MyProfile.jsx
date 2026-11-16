@@ -11,6 +11,7 @@ import PersonalData from "../../components/account/PersonalData.jsx";
 const menuItems = [
   { label: "Visão geral", icon: "⌂", to: "/perfil" },
   { label: "Segurança", icon: "◇", to: "/perfil/seguranca" },
+  { label: "Painel administrador", icon: "⚙", to: "/admin", adminOnly: true },
 ];
 
 const primaryButton =
@@ -19,6 +20,7 @@ const primaryButton =
 
 function Sidebar() {
   const { usuario } = useAuth();
+  const itensVisiveis = menuItems.filter(item => !item.adminOnly || usuario?.role === "admin");
 
   return (
     <aside className="min-w-0 self-start rounded-2xl bg-white p-5 lg:sticky lg:top-36">
@@ -42,7 +44,7 @@ function Sidebar() {
         aria-label="Menu da minha conta"
         className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1"
       >
-        {menuItems.map((item) => (
+        {itensVisiveis.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
