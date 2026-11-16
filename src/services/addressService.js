@@ -113,6 +113,7 @@ async function adicionarEndereco(userId, dados) {
     {
       _id: usuarioId,
       ativo: true,
+      $expr: { $lt: [{ $size: { $ifNull: ["$enderecos", []] } }, 20] },
     },
     [
       {
@@ -158,7 +159,7 @@ async function adicionarEndereco(userId, dados) {
   );
 
   if (!atualizado) {
-    throw new Error("Usuário não encontrado.");
+    throw Object.assign(new Error("Não foi possível salvar: limite de 20 endereços atingido ou conta indisponível."), { statusCode: 409 });
   }
 
   return atualizado.enderecos;
