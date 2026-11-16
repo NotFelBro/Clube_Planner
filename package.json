@@ -15,7 +15,8 @@
     "dev:manual": "node --watch src/server.manual.js",
     "checkout:check": "node scripts/check-mercado-pago.cjs",
     "checkout:preview": "node scripts/preview-checkout.cjs",
-    "deploy:check": "node scripts/check-deploy.mjs"
+    "deploy:check": "node scripts/check-deploy.mjs",
+    "deploy:env": "node scripts/prepare-vercel-env.mjs"
   },
   "repository": {
     "type": "git",
