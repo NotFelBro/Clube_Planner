@@ -94,6 +94,8 @@ describe('painel e loja usando os mesmos registros', () => {
   it('mostra o pedido da loja, consome o estoque após pagar e atualiza a entrega na conta do cliente', async () => {
     const p = await produto(); const resposta = await comprar(p);
     expect(resposta.status).toBe(201); const pedido = resposta.body.data.pedido;
+    const persistido = await Order.findById(pedido.id);
+    expect(persistido.reserva.expiresAt.getTime() - persistido.createdAt.getTime()).toBe(15 * 60000);
     expect((await Product.findById(p._id)).variacoes[0]).toMatchObject({ estoqueDisponivel: 3, estoqueReservado: 2 });
     expect((await api(admin, 'patch', `/api/v1/admin/orders/${pedido.id}/status`, { status: 'em_preparacao' })).status).toBe(409);
     const lista = await api(admin, 'get', '/api/v1/admin/orders?ambiente=teste');
