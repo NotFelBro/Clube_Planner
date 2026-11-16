@@ -1,7 +1,12 @@
 
 import { Link } from "react-router";
+import { useAuth } from "../../contexts/AuthContext.jsx";
+import AdminLayout from "./AdminLayout.jsx";
 
 export default function AdminAccess() {
+  const { usuario, carregando } = useAuth();
+  if (carregando) return <p role="status" className="p-8">Verificando sessão...</p>;
+  if (usuario?.role === "admin") return <AdminLayout />;
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#f5f1df] px-5 py-12 text-[#3d415f]">
       <section className="w-full max-w-lg rounded-2xl border border-[#e5e1d5] bg-white p-8 text-center shadow-sm">
@@ -20,9 +25,8 @@ export default function AdminAccess() {
         </p>
 
         <p className="mt-3 text-sm leading-7 text-[#81849a]">
-          Essa verificação ainda não está integrada.
-          Por segurança, o acesso operacional permanece
-          indisponível.
+          Entre com uma conta de administrador para acessar
+          as operações do catálogo.
         </p>
 
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
