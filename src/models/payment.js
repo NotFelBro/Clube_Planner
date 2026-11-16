@@ -8,6 +8,7 @@ const validarCentavos = {
 };
 
 const paymentSchema = new Schema({
+  taxasCentavos: { type: Number, default: null, min: 0 },
   providerUpdatedAt: { type: Date, default: null },
   orderId: {
     type: Schema.Types.ObjectId,
