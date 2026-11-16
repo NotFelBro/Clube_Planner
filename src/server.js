@@ -8,7 +8,16 @@ const PORT = Number(process.env.PORT) || 3000;
 
 const startServer = async () => {
   try {
+    require("./config/security").validarConfiguracaoSegura();
+    const User = require("./models/User");
+    // A verificação explícita aceita nomes equivalentes e recusa índices inseguros.
+    User.schema.set("autoIndex", false);
     await connectDB();
+    await User.init();
+    await require("./config/userIndexes").garantirIndicesUsuario(User.collection);
+
+    await Promise.all([require("./models/product").init(), require("./models/Category").init(), require("./models/catalogCounter").init(), require("./models/adminEvent").init(), require("./models/storeSettings").init()]);
+    await require("./services/catalogService").inicializarCatalogo({ estoqueInicial: 100 });
 
     const server = app.listen(PORT, () => {
       console.log(
@@ -16,8 +25,18 @@ const startServer = async () => {
       );
     });
 
+    const pararConciliacao = require("./services/paymentReconciliationService").iniciarConciliacaoPagamentos();
+    const pararExpiracao = require("./services/reservationExpiryService").iniciarExpiracaoReservas();
+
+    server.requestTimeout = 30000;
+    server.headersTimeout = 15000;
+    server.keepAliveTimeout = 5000;
+    server.maxRequestsPerSocket = 100;
+
     const shutdown = async (signal) => {
       console.log(`Encerrando aplicação: ${signal}`);
+      pararExpiracao();
+      pararConciliacao();
 
       server.close(async () => {
         try {
