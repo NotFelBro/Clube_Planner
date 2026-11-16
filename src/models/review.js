@@ -8,4 +8,5 @@ const schema = new mongoose.Schema({
   ambienteTeste: { type: Boolean, default: true },
 }, { timestamps: true });
 schema.index({ userId: 1, productId: 1 }, { unique: true });
+schema.index({ productId: 1, createdAt: -1 });
 module.exports = mongoose.models.Review || mongoose.model("Review", schema);
