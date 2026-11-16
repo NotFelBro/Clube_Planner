@@ -9,32 +9,42 @@ import {
 } from "vitest";
 
 import { createRequire } from "node:module";
+import crypto from "node:crypto";
 
 const require = createRequire(import.meta.url);
 
 const User = require("../src/models/User.js");
-
 const emailService = require(
   "../src/services/emailService.js"
 );
-
 const servico = require(
   "../src/services/emailVerificationService.js"
 );
 
-const enviarEmailOriginal =
-  emailService.enviarCodigoVerificacao;
-
-const SEGREDO_TESTE = "a".repeat(64);
-const EMAIL = "cliente@example.com";
-const CODIGO = "123456";
+const enviarOriginal =
+  emailService.enviarLinkVerificacao;
 
 const segredoAnterior =
   process.env.EMAIL_CODE_SECRET;
 
-function criarUsuarioSimulado() {
+const frontendAnterior =
+  process.env.FRONTEND_URL;
+
+const EMAIL = "cliente@example.com";
+const SEGREDO = "a".repeat(64);
+const TOKEN = "b".repeat(64);
+
+function hashToken(token) {
+  return crypto
+    .createHmac("sha256", SEGREDO)
+    .update(token)
+    .digest("hex");
+}
+
+function criarUsuario() {
   return {
     _id: "507f1f77bcf86cd799439011",
+    nome: "Cliente Teste",
     email: EMAIL,
     ativo: true,
     emailVerificado: false,
@@ -53,19 +63,27 @@ function criarQuery(resultado) {
   };
 }
 
-beforeEach(() => {
-  process.env.EMAIL_CODE_SECRET =
-    SEGREDO_TESTE;
+function mockarEnvio(usuario = criarUsuario()) {
+  return vi
+    .spyOn(User, "findOneAndUpdate")
+    .mockReturnValue(criarQuery(usuario));
+}
 
-  emailService.enviarCodigoVerificacao =
-    vi.fn().mockResolvedValue(undefined);
+beforeEach(() => {
+  process.env.EMAIL_CODE_SECRET = SEGREDO;
+  process.env.FRONTEND_URL =
+    "http://localhost:5173";
+
+  emailService.enviarLinkVerificacao = vi
+    .fn()
+    .mockResolvedValue(undefined);
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
 
-  emailService.enviarCodigoVerificacao =
-    enviarEmailOriginal;
+  emailService.enviarLinkVerificacao =
+    enviarOriginal;
 
   if (segredoAnterior === undefined) {
     delete process.env.EMAIL_CODE_SECRET;
@@ -73,141 +91,209 @@ afterEach(() => {
     process.env.EMAIL_CODE_SECRET =
       segredoAnterior;
   }
+
+  if (frontendAnterior === undefined) {
+    delete process.env.FRONTEND_URL;
+  } else {
+    process.env.FRONTEND_URL =
+      frontendAnterior;
+  }
 });
 
-describe("Verificação de e-mail — validações", () => {
-  it("rejeita e-mail inválido no envio", async () => {
+describe("Verificação por link — validações", () => {
+  it("rejeita e-mail inválido", async () => {
     await expect(
-      servico.solicitarCodigo("invalido")
+      servico.solicitarLink("invalido")
     ).rejects.toMatchObject({
       name: "EmailVerificationError",
       statusCode: 400,
     });
   });
 
-  it("rejeita código com formato inválido", async () => {
+  it("rejeita token incompleto", async () => {
     await expect(
-      servico.confirmarCodigo(EMAIL, "123")
+      servico.confirmarLink("123456")
     ).rejects.toMatchObject({
       name: "EmailVerificationError",
       statusCode: 400,
     });
   });
 
-  it("rejeita e-mail inválido na confirmação", async () => {
+  it("rejeita token de formato incorreto", async () => {
     await expect(
-      servico.confirmarCodigo(
-        "email-invalido",
-        CODIGO
-      )
+      servico.confirmarLink("z".repeat(64))
     ).rejects.toMatchObject({
       name: "EmailVerificationError",
       statusCode: 400,
     });
+  });
+
+  it("exige segredo de segurança válido", async () => {
+    process.env.EMAIL_CODE_SECRET = "curto";
+
+    await expect(
+      servico.solicitarLink(EMAIL)
+    ).rejects.toThrow("EMAIL_CODE_SECRET");
   });
 });
 
-describe("Verificação de e-mail — envio", () => {
-  it("retorna resposta genérica para conta não elegível", async () => {
-    const consulta = vi
-      .spyOn(User, "findOneAndUpdate")
-      .mockReturnValue(criarQuery(null));
+describe("Verificação por link — envio", () => {
+  it("responde genericamente para conta não elegível", async () => {
+    mockarEnvio(null);
 
-    const resposta =
-      await servico.solicitarCodigo(EMAIL);
-
-    expect(resposta.mensagem).toContain(
-      "Se houver uma conta cadastrada"
+    const resposta = await servico.solicitarLink(
+      EMAIL
     );
 
-    expect(consulta).toHaveBeenCalledOnce();
+    expect(resposta.mensagem).toContain(
+      "Se houver uma conta pendente"
+    );
 
     expect(
-      emailService.enviarCodigoVerificacao
+      emailService.enviarLinkVerificacao
     ).not.toHaveBeenCalled();
   });
 
-  it("envia um código de seis dígitos", async () => {
-    const usuario = criarUsuarioSimulado();
+  it("envia link com token aleatório", async () => {
+    mockarEnvio();
 
-    vi.spyOn(
-      User,
-      "findOneAndUpdate"
-    ).mockReturnValue(criarQuery(usuario));
-
-    const resposta =
-      await servico.solicitarCodigo(EMAIL);
-
-    expect(resposta.mensagem).toBeTruthy();
+    await servico.solicitarLink(EMAIL);
 
     expect(
-      emailService.enviarCodigoVerificacao
+      emailService.enviarLinkVerificacao
     ).toHaveBeenCalledOnce();
 
-    const [destinatario, codigo] =
-      emailService.enviarCodigoVerificacao
+    const [destinatario, endereco] =
+      emailService.enviarLinkVerificacao
         .mock.calls[0];
 
+    const url = new URL(endereco);
+    const parametros = new URLSearchParams(
+      url.hash.slice(1)
+    );
+
     expect(destinatario).toBe(EMAIL);
-    expect(codigo).toMatch(/^\d{6}$/);
+
+    expect(url.origin).toBe(
+      "http://localhost:5173"
+    );
+
+    expect(url.pathname).toBe(
+      "/confirmar-email"
+    );
+
+    expect(parametros.get("token")).toMatch(
+      /^[a-f0-9]{64}$/
+    );
+
+    expect(url.search).toBe("");
   });
 
-  it("configura validade de dez minutos e limite de reenvio", async () => {
-    const usuario = criarUsuarioSimulado();
+  it("armazena hash, nunca token em texto puro", async () => {
+    const consulta = mockarEnvio();
 
-    const consulta = vi
-      .spyOn(User, "findOneAndUpdate")
-      .mockReturnValue(criarQuery(usuario));
+    await servico.solicitarLink(EMAIL);
+
+    const url = new URL(
+      emailService.enviarLinkVerificacao
+        .mock.calls[0][1]
+    );
+
+    const token = new URLSearchParams(
+      url.hash.slice(1)
+    ).get("token");
+
+    const atualizacao =
+      consulta.mock.calls[0][1];
+
+    const hashArmazenado =
+      atualizacao.$set[
+        "verificacaoEmail.codigoHash"
+      ];
+
+    expect(hashArmazenado).toBe(
+      hashToken(token)
+    );
+
+    expect(hashArmazenado).not.toBe(token);
+    expect(hashArmazenado).toMatch(
+      /^[a-f0-9]{64}$/
+    );
+  });
+
+  it("define validade de dez minutos", async () => {
+    const consulta = mockarEnvio();
 
     const antes = Date.now();
 
-    await servico.solicitarCodigo(EMAIL);
+    await servico.solicitarLink(EMAIL);
 
     const depois = Date.now();
 
-    const [filtro, atualizacao] =
-      consulta.mock.calls[0];
+    const atualizacao =
+      consulta.mock.calls[0][1];
 
-    const dataLimite =
-      filtro.$or[1][
-        "verificacaoEmail.ultimoEnvioEm"
-      ].$lte;
-
-    const expiraEm =
+    const expiracao =
       atualizacao.$set[
         "verificacaoEmail.expiraEm"
       ];
 
     expect(
-      atualizacao.$set[
-        "verificacaoEmail.tentativas"
-      ]
-    ).toBe(0);
-
-    expect(expiraEm.getTime()).toBeGreaterThanOrEqual(
-      antes + 10 * 60 * 1000
+      expiracao.getTime()
+    ).toBeGreaterThanOrEqual(
+      antes + 600000
     );
 
-    expect(expiraEm.getTime()).toBeLessThanOrEqual(
-      depois + 10 * 60 * 1000
-    );
-
-    expect(dataLimite.getTime()).toBeGreaterThanOrEqual(
-      antes - 60 * 1000
-    );
-
-    expect(dataLimite.getTime()).toBeLessThanOrEqual(
-      depois - 60 * 1000
+    expect(
+      expiracao.getTime()
+    ).toBeLessThanOrEqual(
+      depois + 600000
     );
   });
 
-  it("restaura o estado anterior se o SMTP falhar", async () => {
-    const usuario = criarUsuarioSimulado();
+  it("limita reenvio a um por minuto", async () => {
+    const consulta = mockarEnvio();
 
-    vi.spyOn(
-      User,
-      "findOneAndUpdate"
-    ).mockReturnValue(criarQuery(usuario));
+    const antes = Date.now();
+
+    await servico.solicitarLink(EMAIL);
+
+    const depois = Date.now();
+
+    const filtro = consulta.mock.calls[0][0];
+
+    const limite =
+      filtro.$or[1][
+        "verificacaoEmail.ultimoEnvioEm"
+      ].$lte;
+
+    expect(
+      limite.getTime()
+    ).toBeGreaterThanOrEqual(
+      antes - 60000
+    );
+
+    expect(
+      limite.getTime()
+    ).toBeLessThanOrEqual(
+      depois - 60000
+    );
+  });
+
+  it("normaliza o e-mail antes da consulta", async () => {
+    const consulta = mockarEnvio(null);
+
+    await servico.solicitarLink(
+      "  CLIENTE@EXAMPLE.COM  "
+    );
+
+    expect(
+      consulta.mock.calls[0][0].email
+    ).toBe(EMAIL);
+  });
+
+  it("restaura estado anterior quando SMTP falha", async () => {
+    mockarEnvio();
 
     const atualizar = vi
       .spyOn(User, "updateOne")
@@ -216,17 +302,18 @@ describe("Verificação de e-mail — envio", () => {
         modifiedCount: 1,
       });
 
-    emailService.enviarCodigoVerificacao
-      .mockRejectedValue(
-        new Error("Falha simulada do SMTP")
+    emailService.enviarLinkVerificacao
+      .mockRejectedValueOnce(
+        new Error("SMTP indisponível")
       );
 
-    const erroConsole = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => {});
+    vi.spyOn(
+      console,
+      "error"
+    ).mockImplementation(() => {});
 
     await expect(
-      servico.solicitarCodigo(EMAIL)
+      servico.solicitarLink(EMAIL)
     ).rejects.toMatchObject({
       name: "EmailVerificationError",
       statusCode: 503,
@@ -237,7 +324,9 @@ describe("Verificação de e-mail — envio", () => {
     const [filtro, alteracoes] =
       atualizar.mock.calls[0];
 
-    expect(filtro.emailVerificado).toBe(false);
+    expect(filtro.emailVerificado).toBe(
+      false
+    );
 
     expect(
       alteracoes.$set[
@@ -250,315 +339,163 @@ describe("Verificação de e-mail — envio", () => {
         "verificacaoEmail.ultimoEnvioEm"
       ]
     ).toBeNull();
-
-    expect(erroConsole).toHaveBeenCalled();
   });
 });
 
-describe("Verificação de e-mail — confirmação", () => {
-  it("rejeita conta inexistente ou já verificada", async () => {
-    vi.spyOn(User, "findOne")
-      .mockReturnValue(criarQuery(null));
-
-    await expect(
-      servico.confirmarCodigo(EMAIL, CODIGO)
-    ).rejects.toMatchObject({
-      name: "EmailVerificationError",
-      statusCode: 400,
-    });
-  });
-
-  it("rejeita código expirado", async () => {
-    const usuario = criarUsuarioSimulado();
-
-    usuario.verificacaoEmail.codigoHash =
-      "a".repeat(32) + ":" + "b".repeat(64);
-
-    usuario.verificacaoEmail.expiraEm =
-      new Date(Date.now() - 1000);
-
-    vi.spyOn(User, "findOne")
-      .mockReturnValue(criarQuery(usuario));
-
-    await expect(
-      servico.confirmarCodigo(EMAIL, CODIGO)
-    ).rejects.toMatchObject({
-      name: "EmailVerificationError",
-      statusCode: 400,
-    });
-  });
-
-  it("bloqueia após cinco tentativas", async () => {
-    const usuario = criarUsuarioSimulado();
-
-    usuario.verificacaoEmail.codigoHash =
-      "a".repeat(32) + ":" + "b".repeat(64);
-
-    usuario.verificacaoEmail.expiraEm =
-      new Date(Date.now() + 600000);
-
-    usuario.verificacaoEmail.tentativas = 5;
-
-    vi.spyOn(User, "findOne")
-      .mockReturnValue(criarQuery(usuario));
-
-    await expect(
-      servico.confirmarCodigo(EMAIL, CODIGO)
-    ).rejects.toMatchObject({
-      name: "EmailVerificationError",
-      statusCode: 429,
-    });
-  });
-
-  it("rejeita reserva simultânea da mesma tentativa", async () => {
-    const usuario = criarUsuarioSimulado();
-
-    usuario.verificacaoEmail.codigoHash =
-      "a".repeat(32) + ":" + "b".repeat(64);
-
-    usuario.verificacaoEmail.expiraEm =
-      new Date(Date.now() + 600000);
-
-    vi.spyOn(User, "findOne")
-      .mockReturnValue(criarQuery(usuario));
-
-    vi.spyOn(
-      User,
-      "findOneAndUpdate"
-    ).mockResolvedValue(null);
-
-    await expect(
-      servico.confirmarCodigo(EMAIL, CODIGO)
-    ).rejects.toMatchObject({
-      name: "EmailVerificationError",
-      statusCode: 409,
-    });
-  });
-});
-
-
-describe("Verificação de e-mail — confirmação bem-sucedida", () => {
-  const crypto = require("node:crypto");
-
-  function gerarHashValido(codigo) {
-    const salt = crypto.randomBytes(16).toString("hex");
-
-    const hash = crypto
-      .createHmac(
-        "sha256",
-        process.env.EMAIL_CODE_SECRET
-      )
-      .update(`${salt}:${codigo}`, "utf8")
-      .digest("hex");
-
-    return `${salt}:${hash}`;
-  }
-
-  function criarUsuarioComCodigoValido() {
-    const usuario = criarUsuarioSimulado();
-
-    usuario.verificacaoEmail.codigoHash =
-      gerarHashValido(CODIGO);
-
-    usuario.verificacaoEmail.expiraEm =
-      new Date(Date.now() + 10 * 60 * 1000);
-
-    usuario.verificacaoEmail.tentativas = 0;
-
-    return usuario;
-  }
-
-  it("confirma um código correto e verifica a conta", async () => {
-    const usuario = criarUsuarioComCodigoValido();
-
-    const buscar = vi
-      .spyOn(User, "findOne")
-      .mockReturnValue(criarQuery(usuario));
-
-    const atualizar = vi
+describe("Verificação por link — confirmação", () => {
+  it("rejeita token sem conta elegível", async () => {
+    const consulta = vi
       .spyOn(User, "findOneAndUpdate")
-      .mockResolvedValueOnce({
-        ...usuario,
-        verificacaoEmail: {
-          ...usuario.verificacaoEmail,
-          tentativas: 1,
-        },
-      })
-      .mockResolvedValueOnce({
-        ...usuario,
-        emailVerificado: true,
-        emailVerificadoEm: new Date(),
-      });
+      .mockResolvedValue(null);
 
-    const resultado = await servico.confirmarCodigo(
-      EMAIL,
-      CODIGO
-    );
-
-    expect(resultado).toEqual({
-      mensagem: "E-mail verificado com sucesso.",
+    await expect(
+      servico.confirmarLink(TOKEN)
+    ).rejects.toMatchObject({
+      name: "EmailVerificationError",
+      statusCode: 400,
     });
 
-    expect(buscar).toHaveBeenCalledOnce();
-    expect(atualizar).toHaveBeenCalledTimes(2);
+    expect(consulta).toHaveBeenCalledOnce();
+  });
 
-    const [filtroReserva, atualizacaoReserva] =
-      atualizar.mock.calls[0];
+  it("consulta somente tokens não expirados", async () => {
+    const consulta = vi
+      .spyOn(User, "findOneAndUpdate")
+      .mockResolvedValue(null);
 
-    expect(filtroReserva.emailVerificado).toBe(false);
+    await expect(
+      servico.confirmarLink(TOKEN)
+    ).rejects.toMatchObject({
+      statusCode: 400,
+    });
 
-    expect(
-      atualizacaoReserva.$inc[
-        "verificacaoEmail.tentativas"
-      ]
-    ).toBe(1);
-
-    const [filtroConfirmacao, atualizacaoConfirmacao] =
-      atualizar.mock.calls[1];
-
-    expect(filtroConfirmacao.emailVerificado).toBe(false);
+    const filtro = consulta.mock.calls[0][0];
 
     expect(
-      atualizacaoConfirmacao.$set.emailVerificado
-    ).toBe(true);
+      filtro["verificacaoEmail.codigoHash"]
+    ).toBe(hashToken(TOKEN));
 
     expect(
-      atualizacaoConfirmacao.$set.emailVerificadoEm
+      filtro["verificacaoEmail.expiraEm"].$gt
     ).toBeInstanceOf(Date);
 
     expect(
-      atualizacaoConfirmacao.$unset.verificacaoEmail
-    ).toBe("");
+      filtro.emailVerificado
+    ).toBe(false);
+
+    expect(filtro.ativo).toBe(true);
   });
 
-  it("não permite reutilizar um código após a confirmação", async () => {
-    const usuario = criarUsuarioComCodigoValido();
-
-    let contaVerificada = false;
-
-    const buscar = vi
-      .spyOn(User, "findOne")
-      .mockImplementation(() => {
-        return criarQuery(
-          contaVerificada ? null : usuario
-        );
-      });
+  it("ativa conta e remove token em uma operação", async () => {
+    const usuario = {
+      ...criarUsuario(),
+      emailVerificado: true,
+      emailVerificadoEm: new Date(),
+    };
 
     const atualizar = vi
       .spyOn(User, "findOneAndUpdate")
-      .mockImplementation(async (filtro, alteracoes) => {
-        if (contaVerificada) {
-          return null;
-        }
+      .mockResolvedValue(usuario);
 
-        if (alteracoes.$inc) {
-          return {
-            ...usuario,
-            verificacaoEmail: {
-              ...usuario.verificacaoEmail,
-              tentativas: 1,
-            },
-          };
-        }
+    const resultado =
+      await servico.confirmarLink(TOKEN);
 
-        if (
-          alteracoes.$set?.emailVerificado === true
-        ) {
-          contaVerificada = true;
-
-          return {
-            ...usuario,
-            emailVerificado: true,
-            emailVerificadoEm: new Date(),
-          };
-        }
-
-        return null;
-      });
-
-    const primeiraConfirmacao =
-      await servico.confirmarCodigo(
-        EMAIL,
-        CODIGO
-      );
-
-    expect(primeiraConfirmacao.mensagem).toBe(
-      "E-mail verificado com sucesso."
-    );
-
-    expect(contaVerificada).toBe(true);
-
-    await expect(
-      servico.confirmarCodigo(EMAIL, CODIGO)
-    ).rejects.toMatchObject({
-      name: "EmailVerificationError",
-      statusCode: 400,
-    });
-
-    expect(buscar).toHaveBeenCalledTimes(2);
-
-    // A segunda tentativa não deve realizar
-    // nenhuma nova atualização no banco.
-    expect(atualizar).toHaveBeenCalledTimes(2);
-  });
-
-  it("rejeita código incorreto e contabiliza a tentativa", async () => {
-    const usuario = criarUsuarioComCodigoValido();
-
-    vi.spyOn(User, "findOne")
-      .mockReturnValue(criarQuery(usuario));
-
-    const atualizar = vi
-      .spyOn(User, "findOneAndUpdate")
-      .mockResolvedValue({
-        ...usuario,
-        verificacaoEmail: {
-          ...usuario.verificacaoEmail,
-          tentativas: 1,
-        },
-      });
-
-    await expect(
-      servico.confirmarCodigo(EMAIL, "999999")
-    ).rejects.toMatchObject({
-      name: "EmailVerificationError",
-      statusCode: 400,
-      message: "Código inválido.",
-    });
+    expect(resultado).toEqual(usuario);
 
     expect(atualizar).toHaveBeenCalledOnce();
 
+    const [filtro, alteracoes] =
+      atualizar.mock.calls[0];
+
     expect(
-      atualizar.mock.calls[0][1].$inc[
-        "verificacaoEmail.tentativas"
-      ]
-    ).toBe(1);
+      filtro["verificacaoEmail.codigoHash"]
+    ).toBe(hashToken(TOKEN));
+
+    expect(
+      alteracoes.$set.emailVerificado
+    ).toBe(true);
+
+    expect(
+      alteracoes.$set.emailVerificadoEm
+    ).toBeInstanceOf(Date);
+
+    expect(
+      alteracoes.$unset.verificacaoEmail
+    ).toBe("");
   });
 
-  it("não confirma se a atualização final falhar", async () => {
-    const usuario = criarUsuarioComCodigoValido();
-
-    vi.spyOn(User, "findOne")
-      .mockReturnValue(criarQuery(usuario));
+  it("não permite reutilizar token consumido", async () => {
+    const usuario = {
+      ...criarUsuario(),
+      emailVerificado: true,
+    };
 
     const atualizar = vi
       .spyOn(User, "findOneAndUpdate")
-      .mockResolvedValueOnce({
-        ...usuario,
-        verificacaoEmail: {
-          ...usuario.verificacaoEmail,
-          tentativas: 1,
-        },
-      })
+      .mockResolvedValueOnce(usuario)
       .mockResolvedValueOnce(null);
 
+    const primeiro =
+      await servico.confirmarLink(TOKEN);
+
+    expect(
+      primeiro.emailVerificado
+    ).toBe(true);
+
     await expect(
-      servico.confirmarCodigo(EMAIL, CODIGO)
+      servico.confirmarLink(TOKEN)
     ).rejects.toMatchObject({
-      name: "EmailVerificationError",
-      statusCode: 409,
+      statusCode: 400,
     });
 
-    expect(atualizar).toHaveBeenCalledTimes(2);
+    expect(atualizar).toHaveBeenCalledTimes(
+      2
+    );
+  });
+
+  it("não confirma se a atualização falhar", async () => {
+    vi.spyOn(
+      User,
+      "findOneAndUpdate"
+    ).mockRejectedValueOnce(
+      new Error("Falha no banco")
+    );
+
+    await expect(
+      servico.confirmarLink(TOKEN)
+    ).rejects.toThrow("Falha no banco");
+  });
+
+  it("rejeita duas confirmações concorrentes", async () => {
+    const usuario = {
+      ...criarUsuario(),
+      emailVerificado: true,
+    };
+
+    const atualizar = vi
+      .spyOn(User, "findOneAndUpdate")
+      .mockResolvedValueOnce(usuario)
+      .mockResolvedValueOnce(null);
+
+    const resultados = await Promise.allSettled([
+      servico.confirmarLink(TOKEN),
+      servico.confirmarLink(TOKEN),
+    ]);
+
+    expect(
+      resultados.filter(
+        (item) => item.status === "fulfilled"
+      )
+    ).toHaveLength(1);
+
+    expect(
+      resultados.filter(
+        (item) => item.status === "rejected"
+      )
+    ).toHaveLength(1);
+
+    expect(atualizar).toHaveBeenCalledTimes(
+      2
+    );
   });
 });
