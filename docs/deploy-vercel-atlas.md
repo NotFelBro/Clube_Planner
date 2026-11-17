@@ -141,3 +141,13 @@ O build do frontend passou. Os campos utilizados do schema oficial e as rotas
 foram conferidos com os validadores da Vercel. Isso ainda não é evidência de uma
 implantação pública com Atlas: a conexão e o roteamento final devem ser homologados
 após configurar o projeto e cadastrar as variáveis na conta do usuário.
+
+### Homologação pública — conexão corrigida
+
+Após alinhar a senha do usuário de banco à URI privada cadastrada na Vercel,
+`/api/v1/health` respondeu 200 e `/api/v1/shop/orders` sem sessão respondeu 401.
+O verificador público passou: certificados, TLS 1.2/1.3, rejeição de TLS 1.0/1.1,
+redirecionamento HTTP e cabeçalhos no frontend/API. O verificador aceita tanto
+DENY quanto SAMEORIGIN em X-Frame-Options, pois a API usa a política do Helmet.
+Ainda faltam testes de cadastro/e-mail/login e a definição da rede permanente:
+a regra ampla temporária de seis horas no Atlas não é uma solução definitiva.
