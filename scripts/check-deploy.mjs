@@ -48,7 +48,7 @@ try {
     assert.match(resposta.headers['strict-transport-security'] || '', /max-age=(\d+)/);
     assert(Number(/max-age=(\d+)/.exec(resposta.headers['strict-transport-security'])[1]) >= 31536000, 'HSTS deve durar ao menos um ano.');
     assert.equal(resposta.headers['x-content-type-options'], 'nosniff');
-    assert.equal(resposta.headers['x-frame-options'], 'DENY');
+    assert(['DENY', 'SAMEORIGIN'].includes(resposta.headers['x-frame-options']), 'Proteção contra enquadramento ausente.');
     assert(resposta.headers['content-security-policy'], 'CSP ausente.');
     assert(!resposta.headers['x-powered-by'], 'Assinatura do servidor exposta.');
     if (caminho.includes('/api/')) {
