@@ -68,8 +68,28 @@ Depois importá-lo em **Environment Variables**, apenas no ambiente **Production
 SMTP é necessário para confirmação de e-mail e recuperação de senha. Sem ele, a
 API pode responder ao health check, mas os fluxos que enviam e-mail falharão.
 Não usar segredos de produção em Preview nem importar o `.env` de desenvolvimento.
-Não preencher `MP_ACCESS_TOKEN` de produção: pagamentos reais continuam desativados.
-O checkout de demonstração permanece bloqueado em `NODE_ENV=production`.
+Pagamentos reais continuam desativados. O checkout de teste no domínio
+público exige ativação explícita e credenciais de vendedor de teste.
+
+### Sandbox do Mercado Pago no domínio público
+
+No projeto Vercel, mantenha o acesso às variáveis de sistema habilitado e
+cadastre estas variáveis no ambiente **Production**:
+
+| Variável | Valor |
+| --- | --- |
+| `CHECKOUT_SANDBOX_PRODUCTION` | `1` |
+| `CHECKOUT_TEST_MODE` | `mercado_pago` |
+| `MP_ACCESS_TOKEN` | Access Token do vendedor de teste |
+| `MP_WEBHOOK_SECRET` | Segredo de assinatura do webhook |
+| `MP_WEBHOOK_URL` | `https://clube-planner.vercel.app/api/v1/shop/mercado-pago/webhook` |
+
+Em Mercado Pago Developers, configure o evento **Pagamentos** para essa URL.
+Após reimplantar, confirme que `/api/v1/shop/catalog` retorna `habilitado: true`
+e `ambienteTeste: true`. Use um comprador diferente do vendedor e um cartão
+de teste. Os pedidos gerados no domínio público são registrados no Atlas
+de produção e movimentam o estoque do catálogo publicado. Para desativar
+novas compras de teste, remova `CHECKOUT_SANDBOX_PRODUCTION` e reimplante.
 
 ## 3. Configurações do projeto Vercel
 

@@ -51,7 +51,24 @@ describe('integração real da entrada Vercel', () => {
     expect(mongoose.connection.name).toBe('clube_planner_test');
   });
 
-  it('mantém os pagamentos de demonstração bloqueados em produção', async () => {
-    expect(require('../src/services/sampleCatalogService').configuracao().habilitado).toBe(false);
+  it.each([
+    ['production', '', '', 'mercado_pago', true, false],
+    ['production', '1', '', 'mercado_pago', true, false],
+    ['production', '', '1', 'mercado_pago', false, false],
+    ['production', '', '1', 'gratuito', true, false],
+    ['production', '', '1', 'mercado_pago', true, true],
+    ['preview', '', '1', 'mercado_pago', true, false],
+    ['preview', '1', '', 'mercado_pago', true, true],
+  ])('configura o sandbox em %s com flags %s/%s, modo %s e credenciais %s', async (ambiente, preview, producao, modo, credenciais, habilitado) => {
+    vi.stubEnv('VERCEL_ENV', ambiente);
+    vi.stubEnv('CHECKOUT_SANDBOX_PREVIEW', preview);
+    vi.stubEnv('CHECKOUT_SANDBOX_PRODUCTION', producao);
+    vi.stubEnv('CHECKOUT_TEST_MODE', modo);
+    vi.stubEnv('MP_ACCESS_TOKEN', credenciais ? 'token-simulado' : '');
+    vi.stubEnv('MP_WEBHOOK_SECRET', 'assinatura-simulada');
+    vi.stubEnv('MP_WEBHOOK_URL', 'https://clube-planner.vercel.app/api/v1/shop/mercado-pago/webhook');
+    const resposta = await request(handler).get('/api/v1/shop/catalog').set('X-Forwarded-Proto', 'https');
+    expect(resposta.status).toBe(200);
+    expect(resposta.body.data).toMatchObject({ modo, habilitado, ambienteTeste: true });
   });
 });

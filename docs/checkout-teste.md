@@ -14,8 +14,9 @@ unidades transacionalmente e os movimentos aparecem no painel.
 O frete é calculado por CEP em três níveis (R$ 3, R$ 6 e R$ 9), com cupons por
 nível em produtos participantes; veja `frete-por-cep.md`. Cancelamento, pagamento,
 reembolso e expiração atualizam os mesmos registros e o estoque conforme o
-estágio da entrega. O checkout permanece de demonstração, bloqueado em produção,
-sem cobrança ou entrega real. Veja [a integração administrativa](painel-administrativo.md).
+estágio da entrega. O checkout é de demonstração, sem cobrança ou entrega real.
+Na Vercel, o checkout no domínio público exige a configuração explícita do
+[sandbox em produção](deploy-vercel-atlas.md#sandbox-do-mercado-pago-no-domínio-público).
 
 ## Produtos gratuitos e frete
 

@@ -136,7 +136,7 @@ export default function Checkout() {
           </div>
           <p className="mt-5 border-t border-line pt-4 text-xl font-semibold">Total: {totalCentavos === null ? "A calcular" : formatPrice(totalCentavos / 100)}</p>
           <h3 className="mt-6 font-semibold">Pagamento</h3>
-          <p className="mt-2 text-sm text-muted">Checkout Pro do Mercado Pago: o total inclui os produtos e o frete. Escolha o meio de pagamento disponível no Mercado Pago.</p>
+          <p className="mt-2 text-sm text-muted">Checkout Pro de teste do Mercado Pago. Use uma conta e um meio de pagamento de teste. O total inclui os produtos e o frete.</p>
           {checkoutConfig?.habilitado === false && <p role="status" className="mt-4 text-sm">Os pagamentos estão desativados neste ambiente.</p>}
           {estoqueInsuficiente && <p role="alert" className="mt-4 text-sm text-red-800">Alguns produtos não têm estoque suficiente. Atualize as quantidades na sacola antes de confirmar.</p>}
           {erro && <p role="alert" className="mt-4 text-sm text-red-800">{erro}</p>}
