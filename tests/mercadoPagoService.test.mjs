@@ -9,6 +9,19 @@ function configurar() {
 }
 const pedido = { _id: "000000000000000000000001", itens: [{ lineId: "sample-1", nomeProduto: "Planner", quantidade: 2, precoUnitarioCentavos: 100 }], reserva: { expiresAt: new Date(Date.now() + 600000) } };
 describe("Adaptador Mercado Pago", () => {
+  it("identifica credencial rejeitada sem registrar o token", async () => {
+    configurar();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 401 }));
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await expect(mp.criarPreferencia(pedido)).rejects.toThrow("rejeitou a credencial");
+      expect(JSON.parse(log.mock.calls[0][0])).toEqual({
+        evento: "falha_mercado_pago", operacao: "validar_vendedor", statusProvedor: 401,
+      });
+    } finally {
+      log.mockRestore();
+    }
+  });
   it("bloqueia vendedor real antes de criar preferência", async () => {
     configurar(); const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ id: 1, tags: [] }) }); vi.stubGlobal("fetch", fetch);
     await expect(mp.criarPreferencia(pedido)).rejects.toThrow("vendedor de teste"); expect(fetch).toHaveBeenCalledTimes(1);

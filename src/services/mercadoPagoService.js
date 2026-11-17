@@ -6,14 +6,27 @@ async function request(path, options = {}) {
   exigirTeste();
   const token = process.env.MP_ACCESS_TOKEN;
   if (!token) throw new AuthError("Configure as credenciais da conta de teste Mercado Pago no servidor.", 409);
+  const operacao = path === "/users/me" ? "validar_vendedor"
+    : path === "/checkout/preferences" ? "criar_preferencia" : "consultar_ou_atualizar_pagamento";
+  let statusProvedor;
   try {
     const response = await fetch(`https://api.mercadopago.com${path}`, {
       ...options, signal: AbortSignal.timeout(15000),
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...options.headers },
     });
+    statusProvedor = response.status;
     if (!response.ok) throw new Error("Provedor indisponível");
     return await response.json();
-  } catch { throw new AuthError("Não foi possível consultar o Mercado Pago. Tente novamente.", 409); }
+  } catch {
+    console.error(JSON.stringify({ evento: "falha_mercado_pago", operacao, statusProvedor }));
+    if (statusProvedor === 401 || statusProvedor === 403) {
+      throw new AuthError("O Mercado Pago rejeitou a credencial de teste da loja.", 409);
+    }
+    if (operacao === "criar_preferencia") {
+      throw new AuthError("Não foi possível abrir o checkout de teste no Mercado Pago. Tente novamente.", 409);
+    }
+    throw new AuthError("Não foi possível consultar o Mercado Pago. Tente novamente.", 409);
+  }
 }
 async function vendedorTeste() {
   const vendedor = await request("/users/me");
