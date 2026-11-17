@@ -63,7 +63,7 @@ export default function Checkout() {
   const estoqueInsuficiente = itens.some(item => item.quantidade > (products.find(p => p.id === item.id)?.stock ?? 0));
   async function confirmar(event) {
     event.preventDefault();
-    if (salvando || carregando || novoEndereco || !enderecoId || !frete || estoqueInsuficiente) return;
+    if (salvando || carregando || novoEndereco || !enderecoId || !frete || estoqueInsuficiente || !checkoutConfig?.habilitado) return;
     setSalvando(true); setErro("");
     try {
       const assinatura = JSON.stringify({ itens, enderecoId, totalCentavos, frete: frete.valorCentavos, cupomFrete });
@@ -136,7 +136,7 @@ export default function Checkout() {
           <p className="mt-5 border-t border-line pt-4 text-xl font-semibold">Total: {totalCentavos === null ? "A calcular" : formatPrice(totalCentavos / 100)}</p>
           <h3 className="mt-6 font-semibold">Pagamento</h3>
           <p className="mt-2 text-sm text-muted">Checkout Pro do Mercado Pago: o total inclui os produtos e o frete. Escolha o meio de pagamento disponível no Mercado Pago.</p>
-          {!checkoutConfig?.habilitado && <p role="alert" className="mt-4 text-sm">Checkout indisponível. Verifique a conexão com o servidor.</p>}
+          {checkoutConfig?.habilitado === false && <p role="status" className="mt-4 text-sm">Os pagamentos estão desativados neste ambiente.</p>}
           {estoqueInsuficiente && <p role="alert" className="mt-4 text-sm text-red-800">Alguns produtos não têm estoque suficiente. Atualize as quantidades na sacola antes de confirmar.</p>}
           {erro && <p role="alert" className="mt-4 text-sm text-red-800">{erro}</p>}
           <button disabled={salvando || carregando || novoEndereco || !enderecoId || !frete || estoqueInsuficiente || !checkoutConfig?.habilitado} className="mt-6 min-h-12 w-full rounded-xl bg-terracotta px-4 font-semibold text-white disabled:opacity-60">{salvando ? "Confirmando..." : "Criar pedido e continuar para pagamento"}</button>

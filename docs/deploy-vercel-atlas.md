@@ -69,7 +69,31 @@ SMTP é necessário para confirmação de e-mail e recuperação de senha. Sem e
 API pode responder ao health check, mas os fluxos que enviam e-mail falharão.
 Não usar segredos de produção em Preview nem importar o `.env` de desenvolvimento.
 Não preencher `MP_ACCESS_TOKEN` de produção: pagamentos reais continuam desativados.
-O checkout de demonstração permanece bloqueado em `NODE_ENV=production`.
+O checkout de demonstração permanece bloqueado no deploy **Production**
+da Vercel e pode ser habilitado em um **Preview** dedicado.
+
+### Preview para pagamento de teste
+
+1. Crie um deploy Preview em uma branch dedicada, como `checkout-sandbox`, e
+   use a URL estável da branch como `FRONTEND_URL` do Preview, sem barra final.
+   Mantenha habilitadas as variáveis de sistema da Vercel.
+2. Cadastre nessa branch as variáveis obrigatórias de autenticação e e-mail,
+   com segredos próprios. Configure `MONGODB_URI` para um banco Atlas separado
+   com produtos e categorias de teste. Use contas de comprador da aplicação
+   criadas nesse Preview. Pedidos de teste reservam estoque de verdade no banco
+   configurado, por isso o banco deve ser separado do catálogo publicado.
+3. Configure `CHECKOUT_SANDBOX_PREVIEW=1`, `CHECKOUT_TEST_MODE=mercado_pago`,
+   `MP_ACCESS_TOKEN` do vendedor de teste e `MP_WEBHOOK_SECRET` da aplicação
+   Mercado Pago. Defina `MP_WEBHOOK_URL` como a origem do Preview seguida de
+   `/api/v1/shop/mercado-pago/webhook`.
+4. Para testar notificações, configure o evento **Pagamentos** no Mercado Pago
+   para essa URL e confirme que o provedor consegue chamar a rota. A proteção
+   da Vercel pode exigir configuração adicional. A aplicação verifica a
+   assinatura do webhook. A página de detalhes do pedido também consulta o
+   pagamento diretamente.
+5. Reimplante o Preview. A resposta de `/api/v1/shop/catalog` deve incluir
+   `habilitado: true` e `ambienteTeste: true`. Use comprador e cartão de teste
+   do Mercado Pago para validar um pedido de ponta a ponta.
 
 ## 3. Configurações do projeto Vercel
 

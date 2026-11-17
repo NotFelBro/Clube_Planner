@@ -3,7 +3,14 @@ const { AuthError } = require("./authService");
 
 function configuracao() {
   const modo = process.env.CHECKOUT_TEST_MODE || "mercado_pago";
-  const habilitado = process.env.NODE_ENV !== "production" && ["gratuito", "mercado_pago"].includes(modo);
+  const ambienteLocal = process.env.VERCEL !== "1" && process.env.NODE_ENV !== "production";
+  const sandboxPreview = process.env.VERCEL === "1" &&
+    process.env.VERCEL_ENV === "preview" &&
+    process.env.CHECKOUT_SANDBOX_PREVIEW === "1" &&
+    modo === "mercado_pago" &&
+    [process.env.MP_ACCESS_TOKEN, process.env.MP_WEBHOOK_SECRET, process.env.MP_WEBHOOK_URL]
+      .every(valor => Boolean(valor?.trim()));
+  const habilitado = sandboxPreview || (ambienteLocal && ["gratuito", "mercado_pago"].includes(modo));
   return { modo, habilitado, freteCalculadoPorCep: true, ambienteTeste: true };
 }
 function exigirTeste() {
