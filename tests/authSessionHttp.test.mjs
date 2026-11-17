@@ -332,12 +332,12 @@ describe("Autenticação — Sessões HTTP", () => {
     } finally { process.env.NODE_ENV = anterior; }
   });
 
-  it("renova uma sessão válida", async () => {
+  it.each(["/refresh", "/refresh?restaurar=1"])("renova uma sessão válida em %s", async (rota) => {
     const { cookie } =
       await criarSessaoDeTeste();
 
     const resposta = await request(app)
-      .post(`${BASE}/refresh`)
+      .post(`${BASE}${rota}`)
       .set("Origin", ORIGEM)
       .set("Cookie", cookie);
 
@@ -388,6 +388,24 @@ describe("Autenticação — Sessões HTTP", () => {
 
     expect(resposta.status).toBe(401);
   });
+
+  it.each(["", "refreshToken=token-invalido"])(
+    "restaura a navegação anônima com cookie ausente ou inválido (%s)",
+    async (cookie) => {
+      const requisicao = request(app)
+        .post(`${BASE}/refresh?restaurar=1`)
+        .set("Origin", ORIGEM);
+
+      if (cookie) requisicao.set("Cookie", cookie);
+
+      const resposta = await requisicao;
+
+      expect(resposta.status).toBe(200);
+      expect(resposta.body).toEqual({ success: true, data: { usuario: null } });
+      expect(resposta.headers["cache-control"]).toBe("no-store");
+      expect(obterCookie(resposta)).toBe("refreshToken=");
+    }
+  );
 
   it("rejeita refresh token inválido", async () => {
     const resposta = await request(app)

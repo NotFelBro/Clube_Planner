@@ -22,10 +22,10 @@ const AuthContext = createContext(null);
 // inclusive durante a verificação inicial do StrictMode.
 let renovacaoPendente = null;
 
-function renovarUmaVez() {
+function renovarUmaVez(opcoes) {
   if (!renovacaoPendente) {
     const requisicao = Promise.resolve().then(() =>
-      renovarAutenticacao()
+      renovarAutenticacao(opcoes)
     );
 
     renovacaoPendente = requisicao;
@@ -112,6 +112,11 @@ export function AuthProvider({ children }) {
         geracao !== geracaoRef.current ||
         !montadoRef.current
       ) {
+        return null;
+      }
+
+      if (dados.usuario === null) {
+        limparSessao();
         return null;
       }
 
@@ -234,14 +239,18 @@ export function AuthProvider({ children }) {
       const geracao = geracaoRef.current;
 
       try {
-        const dados = await renovarUmaVez();
+        const dados = await renovarUmaVez({ restaurar: true });
 
         if (
           ativo &&
           montadoRef.current &&
           geracao === geracaoRef.current
         ) {
-          atualizarSessao(dados);
+          if (dados.usuario === null) {
+            limparSessao();
+          } else {
+            atualizarSessao(dados);
+          }
         }
       } catch {
         if (

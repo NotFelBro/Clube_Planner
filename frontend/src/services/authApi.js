@@ -80,8 +80,8 @@ export function autenticarCliente(email, senha) {
   return requisitar("/login", { method: "POST", body: { email, senha } });
 }
 
-export async function renovarAutenticacao() {
-  return requisitar("/refresh", {
+export async function renovarAutenticacao({ restaurar = false } = {}) {
+  return requisitar(restaurar ? "/refresh?restaurar=1" : "/refresh", {
     method: "POST",
   });
 }

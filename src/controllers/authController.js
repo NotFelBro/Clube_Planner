@@ -154,6 +154,8 @@ async function login(req, res, next) {
 }
 
 async function refresh(req, res, next) {
+  res.set("Cache-Control", "no-store");
+
   try {
     const refreshToken = req.cookies?.refreshToken;
 
@@ -178,7 +180,6 @@ async function refresh(req, res, next) {
       .lean();
 
     if (!usuario) {
-      limparCookie(res);
       throw new SessionError();
     }
 
@@ -200,6 +201,13 @@ async function refresh(req, res, next) {
   } catch (erro) {
     if (erro instanceof SessionError) {
       limparCookie(res);
+
+      if (req.query.restaurar === "1") {
+        return res.status(200).json({
+          success: true,
+          data: { usuario: null },
+        });
+      }
     }
 
     return next(erro);
