@@ -23,7 +23,7 @@ export default function Checkout() {
   const originalSubtotal = cart.reduce((sum, item) => sum + Math.round((item.originalPrice ?? item.price) * 100), 0) / 100;
   const desconto = originalSubtotal - cartSubtotal;
   const voltarPara = compraDireta && produto ? `/produto/${produto.id}` : "/sacola";
-  const { accessToken, autenticado, usuario } = useAuth();
+  const { accessToken, autenticado, usuario, renovar } = useAuth();
   const [enderecos, setEnderecos] = useState([]);
   const [enderecoId, setEnderecoId] = useState("");
   const [novoEndereco, setNovoEndereco] = useState(false);
@@ -73,7 +73,13 @@ export default function Checkout() {
       try { tentativa = JSON.parse(sessionStorage.getItem(storageKey)); } catch { /* Nova tentativa. */ }
       if (tentativa?.assinatura !== assinatura) tentativa = { assinatura, chave: crypto.randomUUID() };
       sessionStorage.setItem(storageKey, JSON.stringify(tentativa));
-      const { pedido } = await shopApi("/checkout", accessToken, { itens, enderecoId, chave: tentativa.chave, totalEsperadoCentavos: totalCentavos, freteEsperadoCentavos: frete.valorCentavos, cupomFrete });
+      const dadosPedido = { itens, enderecoId, chave: tentativa.chave, totalEsperadoCentavos: totalCentavos, freteEsperadoCentavos: frete.valorCentavos, cupomFrete };
+      const { pedido } = await shopApi("/checkout", accessToken, dadosPedido).catch(async (error) => {
+        if (error.status !== 401) throw error;
+        const tokenRenovado = await renovar({ usuarioIdEsperado: usuario.id });
+        if (!tokenRenovado) throw new Error("Entre novamente para continuar a compra.");
+        return shopApi("/checkout", tokenRenovado, dadosPedido);
+      });
       // O pedido já está persistido. O pagamento pode ser retomado pelos detalhes.
       if (!compraDireta) clearCart();
       sessionStorage.removeItem(storageKey);

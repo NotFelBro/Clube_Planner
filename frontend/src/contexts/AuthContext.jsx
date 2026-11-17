@@ -97,7 +97,7 @@ export function AuthProvider({ children }) {
     return dados.usuario;
   }, [atualizarSessao]);
 
-  const renovar = useCallback(async () => {
+  const renovar = useCallback(async ({ usuarioIdEsperado } = {}) => {
     if (logoutPendenteRef.current) {
       await logoutPendenteRef.current;
       return null;
@@ -121,6 +121,9 @@ export function AuthProvider({ children }) {
       }
 
       atualizarSessao(dados);
+      if (usuarioIdEsperado && dados.usuario.id !== usuarioIdEsperado) {
+        return null;
+      }
       return dados.accessToken;
     } catch (erro) {
       if (
