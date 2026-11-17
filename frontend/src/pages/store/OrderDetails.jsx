@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { useAuth } from "../../contexts/AuthContext.jsx";
 import { shopApi } from "../../services/shopApi.js";
@@ -16,6 +16,7 @@ function OrderContent({ id }) {
   const [erro, setErro] = useState("");
   const [confirmarCancelamento, setConfirmarCancelamento] = useState(false);
   const [ocupado, setOcupado] = useState(false);
+  const sincronizacaoPausada = useRef(false);
   useEffect(() => {
     let ativo = true;
     let executando = false;
@@ -24,10 +25,20 @@ function OrderContent({ id }) {
       executando = true;
       try {
         const dados = await shopApi(`/orders/${id}`, accessToken);
-        if (ativo) setPedido(dados.pedido);
-        if (dados.pedido.pagamentoTipo === "mercado_pago" && (dados.pedido.status === "aguardando_pagamento" || dados.pedido.cancelamentoSolicitadoEm && dados.pedido.pagamentoStatus !== "reembolsado")) {
-          const atualizado = await shopApi(`/orders/${id}/sync`, accessToken, {});
-          if (ativo) { setPedido(atualizado.pedido); setErro(""); }
+        if (!ativo) return;
+        setPedido(dados.pedido);
+        const { checkoutUrl, status, pagamentoTipo, cancelamentoSolicitadoEm, pagamentoStatus } = dados.pedido;
+        const aguardaPagamento = status === "aguardando_pagamento" && Boolean(checkoutUrl);
+        const aguardaReembolso = cancelamentoSolicitadoEm && pagamentoStatus !== "reembolsado";
+        if (!sincronizacaoPausada.current && pagamentoTipo === "mercado_pago" && (aguardaPagamento || aguardaReembolso)) {
+          try {
+            const atualizado = await shopApi(`/orders/${id}/sync`, accessToken, {});
+            if (ativo) { setPedido(atualizado.pedido); setErro(""); }
+          } catch (error) {
+            if (!ativo) return;
+            if (error.status === 409) sincronizacaoPausada.current = true;
+            setErro(error.message);
+          }
         }
       } catch (error) { if (ativo) setErro(error.message); }
       finally { executando = false; }
@@ -46,6 +57,7 @@ function OrderContent({ id }) {
     setOcupado(true); setErro("");
     try {
       const dados = await shopApi(`/orders/${id}/${tipo}`, accessToken, {});
+      if (tipo === "sync") sincronizacaoPausada.current = false;
       if (tipo === "cancel" && dados.pedido.status === "cancelado") {
         navigate("/perfil#pedidos", {
           replace: true,
@@ -72,7 +84,7 @@ function OrderContent({ id }) {
         <div className="flex flex-wrap justify-between gap-3"><h2 className="font-semibold">Pedido #{pedido.id.slice(-8).toUpperCase()}</h2><p>{statusPedido[pedido.status]}</p></div>
         <p className="mt-2 text-sm text-muted">{new Date(pedido.criadoEm).toLocaleString("pt-BR")}</p>
         <p className="mt-4 text-sm">{pedido.pagamentoTipo === "gratuito" ? "Pedido gratuito confirmado. Pagamento dispensado; nenhuma cobrança foi realizada." : `Mercado Pago · ${pedido.pagamentoStatus || "Aguardando pagamento"}`}</p>
-        {pedido.pagamentoTipo === "mercado_pago" && pedido.status === "aguardando_pagamento" && !pedido.cancelamentoSolicitadoEm && <div className="mt-5 flex flex-wrap gap-3"><button disabled={ocupado} onClick={() => acao("payment")} className="rounded-xl bg-terracotta px-5 py-3 text-sm font-semibold text-white disabled:opacity-60">{ocupado ? "Aguarde..." : "Pagar no Mercado Pago"}</button><button disabled={ocupado} onClick={() => acao("sync")} className="rounded-xl border border-line px-5 py-3 text-sm">Atualizar pagamento</button></div>}
+        {pedido.pagamentoTipo === "mercado_pago" && pedido.status === "aguardando_pagamento" && !pedido.cancelamentoSolicitadoEm && <div className="mt-5 flex flex-wrap gap-3"><button disabled={ocupado} onClick={() => acao("payment")} className="rounded-xl bg-terracotta px-5 py-3 text-sm font-semibold text-white disabled:opacity-60">{ocupado ? "Aguarde..." : "Pagar no Mercado Pago"}</button>{pedido.checkoutUrl && <button disabled={ocupado} onClick={() => acao("sync")} className="rounded-xl border border-line px-5 py-3 text-sm">Atualizar pagamento</button>}</div>}
         {pedido.cancelamentoSolicitadoEm && pedido.status !== "cancelado" && <p role="status" className="mt-4 text-sm">Cancelamento solicitado. Estamos aguardando a confirmação do cancelamento ou reembolso. <button disabled={ocupado} onClick={() => acao("cancel")} className="underline">Tentar novamente</button></p>}
         {pedido.status === "cancelado" && <p role="status" className="mt-4 text-sm">{pedido.pagamentoStatus === "reembolsado" ? "Pedido cancelado e reembolso integral confirmado pelo Mercado Pago, incluindo o frete. O prazo para o valor aparecer depende do meio de pagamento." : "Pedido cancelado. Se houver confirmação tardia de pagamento, o sistema solicitará o reembolso integral."}</p>}
         {["aguardando_pagamento", "pago", "em_preparacao", "enviado"].includes(pedido.status) && !pedido.cancelamentoSolicitadoEm && <div className="mt-5 border-t border-line pt-4">
