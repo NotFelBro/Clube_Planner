@@ -95,28 +95,33 @@ function Chart({
 }) {
   if (!series.length) return <Empty>Nenhum recebimento confirmado neste período.</Empty>;
   const max = Math.max(1, ...series.map(p => p.brutoCentavos));
+  const esquerda = 105;
+  const direita = 740;
+  const base = 126;
+  const altura = 104;
+  const espaco = (direita - esquerda) / series.length;
+  const largura = Math.min(28, espaco * 0.6);
   const diaUnico = series.length === 1;
-  const pontos = series.map((dia, indice) => ({
-    ...dia,
-    x: diaUnico ? 390 : 40 + indice / (series.length - 1) * 700,
-    y: 153 - dia.brutoCentavos / max * 120,
-  }));
 
   return <div>
-    <svg viewBox="0 0 760 190" role="img" aria-label="Recebimentos brutos confirmados por dia" className="block w-full">
+    <svg viewBox="0 0 760 158" role="img" aria-label="Recebimentos brutos confirmados por dia" className="block w-full">
       {[0, 0.5, 1].map(fracao => {
-        const y = 153 - fracao * 120;
+        const y = base - fracao * altura;
         return <g key={fracao}>
-          <line x1="40" x2="740" y1={y} y2={y} stroke="#e5e1d5" strokeDasharray={fracao ? '4 4' : undefined} />
-          <text x="40" y={y - 8} fontSize="11" fill="#81849a">{money(Math.round(max * fracao))}</text>
+          <line x1={esquerda} x2={direita} y1={y} y2={y} stroke="#e5e1d5" />
+          <text x={esquerda - 10} y={y + 4} textAnchor="end" fontSize="13" fill="#60657e">{money(Math.round(max * fracao))}</text>
         </g>;
       })}
-      {!diaUnico && <polyline points={pontos.map(({ x, y }) => `${x},${y}`).join(' ')} fill="none" stroke="#e47c62" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />}
-      {pontos.map(ponto => <circle key={ponto._id} cx={ponto.x} cy={ponto.y} r={diaUnico ? 5 : 2.5} fill="#e47c62">
-        <title>{ponto._id}: {money(ponto.brutoCentavos)} · {ponto.transacoes} pagamento(s)</title>
-      </circle>)}
-      <text x={diaUnico ? 390 : 40} y="178" textAnchor={diaUnico ? 'middle' : 'start'} fontSize="11" fill="#81849a">{series[0]._id}</text>
-      {!diaUnico && <text x="740" y="178" textAnchor="end" fontSize="11" fill="#81849a">{series.at(-1)._id}</text>}
+      <line x1={esquerda} x2={esquerda} y1={base - altura} y2={base} stroke="#e5e1d5" />
+      {series.map((dia, indice) => {
+        const alturaColuna = dia.brutoCentavos / max * altura;
+        const x = esquerda + (indice + 0.5) * espaco - largura / 2;
+        return <rect key={dia._id} x={x} y={base - alturaColuna} width={largura} height={alturaColuna} rx="2" fill="#e47c62">
+          <title>{dia._id}: {money(dia.brutoCentavos)} · {dia.transacoes} pagamento(s)</title>
+        </rect>;
+      })}
+      <text x={diaUnico ? esquerda + espaco / 2 : esquerda} y="149" textAnchor={diaUnico ? 'middle' : 'start'} fontSize="13" fill="#60657e">{series[0]._id}</text>
+      {!diaUnico && <text x={direita} y="149" textAnchor="end" fontSize="13" fill="#60657e">{series.at(-1)._id}</text>}
     </svg>
     <p className="text-xs text-muted">Valores capturados pelo provedor, por data de aprovação. Até 366 datas recentes com recebimentos, no horário de São Paulo.</p>
   </div>;
