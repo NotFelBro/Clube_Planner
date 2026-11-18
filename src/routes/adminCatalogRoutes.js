@@ -15,8 +15,12 @@ const executar = (fn) => async (req, res, next) => {
 };
 router.use(protegerAdmin);
 router.get('/catalog', executar(async (req, res) => {
-  const [produtos, categorias] = await Promise.all([Product.find().sort({ updatedAt: -1 }).maxTimeMS(5000).lean(), Category.find().sort({ nome: 1 }).maxTimeMS(5000).lean()]);
-  res.json({ success: true, data: { produtos, categorias } });
+  const [registros, categorias] = await Promise.all([Product.find().sort({ updatedAt: -1 }).maxTimeMS(5000).lean(), Category.find().sort({ nome: 1 }).maxTimeMS(5000).lean()]);
+  const produtos = registros
+    .filter(produto => Array.isArray(produto.variacoes) && produto.variacoes.length > 0 &&
+      produto.variacoes.every(variacao => typeof variacao?.sku === 'string'))
+    .map(produto => ({ ...produto, imagens: produto.imagens ?? [] }));
+  res.json({ success: true, data: { produtos, categorias, registrosInvalidos: registros.length - produtos.length } });
 }));
 router.use((req, res, next) => ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method) ? validarOrigem(req, res, next) : next());
 for (const [path, Model] of [['categories', Category], ['products', Product]]) {

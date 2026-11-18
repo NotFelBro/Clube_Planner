@@ -27,6 +27,24 @@ describe('administrative catalog', () => {
   it('requires the approved origin on writes', async () => {
     expect((await request(app).post('/admin/products').set('x-role', 'admin').send(body())).status).toBe(403);
   });
+  it('returns the catalog when an imported category was inserted into products', async () => {
+    const categoria = { _id: categoryId, nome: 'Cadernos' };
+    const produto = body();
+    delete produto.imagens;
+    vi.spyOn(Product, 'find').mockReturnValue({
+      sort: vi.fn().mockReturnThis(), maxTimeMS: vi.fn().mockReturnThis(),
+      lean: vi.fn().mockResolvedValue([categoria, produto]),
+    });
+    vi.spyOn(Category, 'find').mockReturnValue({
+      sort: vi.fn().mockReturnThis(), maxTimeMS: vi.fn().mockReturnThis(),
+      lean: vi.fn().mockResolvedValue([categoria]),
+    });
+    const resposta = await request(app).get('/admin/catalog').set('x-role', 'admin');
+    expect(resposta.status).toBe(200);
+    expect(resposta.body.data).toEqual({
+      produtos: [{ ...produto, imagens: [] }], categorias: [categoria], registrosInvalidos: 1,
+    });
+  });
   it('creates a product without accepting client supplied reserved stock', async () => {
     vi.spyOn(Category, 'exists').mockResolvedValue({ _id: categoryId });
     const create = vi.spyOn(Product, 'create').mockImplementation(async data => data);
