@@ -447,13 +447,15 @@ describe('Cancelamento pela conta do cliente', () => {
     const p = (await post(c, '/checkout', compra(c))).body.data.pedido;
     const pagamento = { id: '7654321', external_reference: p.id, live_mode: false, currency_id: 'BRL', transaction_amount: 6, status: 'approved', date_last_updated: new Date().toISOString() };
     await orders.aplicarPagamento(pagamento);
-    vi.spyOn(mp, 'encerrarPreferencia').mockResolvedValue({});
+    await Order.updateOne({ _id: p.id }, { $set: { preferenceId: 'pref-expirada', 'reserva.expiresAt': new Date(Date.now() - 1000) } });
+    const encerrar = vi.spyOn(mp, 'encerrarPreferencia').mockRejectedValue(new Error('Preferência expirada'));
     const reembolsado = { ...pagamento, status: 'refunded', date_last_updated: new Date(Date.now() + 1000).toISOString() };
     vi.spyOn(mp, 'buscarPagamentos').mockResolvedValue([pagamento]);
     vi.spyOn(mp, 'cancelarOuReembolsar').mockResolvedValue(reembolsado);
     const resposta = await post(c, `/orders/${p.id}/cancel`, {});
     expect(resposta.status).toBe(200);
     expect(resposta.body.data.pedido).toMatchObject({ status: 'cancelado', pagamentoStatus: 'reembolsado', totalCentavos: 600 });
+    expect(encerrar).not.toHaveBeenCalled();
     expect((await Payment.findOne({ orderId: p.id })).refundSucceededCentavos).toBe(600);
     mp.buscarPagamentos.mockResolvedValue([reembolsado]);
     expect((await post(c, `/orders/${p.id}/cancel`, {})).status).toBe(200);

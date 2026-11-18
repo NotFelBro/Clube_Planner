@@ -6,8 +6,13 @@ async function request(path, options = {}) {
   exigirTeste();
   const token = process.env.MP_ACCESS_TOKEN;
   if (!token) throw new AuthError("Configure as credenciais da conta de teste Mercado Pago no servidor.", 409);
-  const operacao = path === "/users/me" ? "validar_vendedor"
-    : path === "/checkout/preferences" ? "criar_preferencia" : "consultar_ou_atualizar_pagamento";
+  let operacao = "consultar_pagamento";
+  if (path === "/users/me") operacao = "validar_vendedor";
+  else if (path === "/checkout/preferences") operacao = "criar_preferencia";
+  else if (path.startsWith("/checkout/preferences/")) operacao = "encerrar_preferencia";
+  else if (path.endsWith("/refunds")) operacao = "solicitar_reembolso";
+  else if (options.method === "PUT") operacao = "cancelar_pagamento";
+  else if (path.startsWith("/v1/payments/search")) operacao = "buscar_pagamentos";
   let statusProvedor;
   try {
     const response = await fetch(`https://api.mercadopago.com${path}`, {
@@ -20,6 +25,9 @@ async function request(path, options = {}) {
   } catch {
     console.error(JSON.stringify({ evento: "falha_mercado_pago", operacao, statusProvedor }));
     if (statusProvedor === 401 || statusProvedor === 403) {
+      if (operacao === "solicitar_reembolso") {
+        throw new AuthError("O Mercado Pago não autorizou o reembolso. O cancelamento segue pendente.", 409);
+      }
       throw new AuthError("O Mercado Pago rejeitou a credencial de teste da loja.", 409);
     }
     if (operacao === "criar_preferencia") {

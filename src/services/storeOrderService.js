@@ -193,7 +193,11 @@ async function cancelarPedido(userId, id) {
     { $set: { cancelamentoOrigem: "cliente", cancelamentoSolicitadoEm: pedido.cancelamentoSolicitadoEm || new Date() } }, { returnDocument: "after" });
   if (!marcado) throw new AuthError("O pedido está sendo atualizado. Tente novamente.", 409);
   if (marcado.pagamentoTipo === "mercado_pago" && (marcado.preferenceId || marcado.pagoEm)) {
-    await mp.encerrarPreferencia(marcado.preferenceId);
+    // A preferência já tem o mesmo prazo da reserva. Depois desse prazo, o
+    // reembolso pode seguir sem tentar editar um checkout que já expirou.
+    if (marcado.preferenceId && !(marcado.reserva?.expiresAt <= new Date())) {
+      await mp.encerrarPreferencia(marcado.preferenceId);
+    }
     const pagamentos = await mp.buscarPagamentos(String(id));
     for (const pagamento of pagamentos) {
       if (mp.valorPagamentoCentavos(pagamento) !== marcado.totalCentavos || pagamento.currency_id !== "BRL") throw new AuthError("Valor do pagamento não corresponde ao pedido.", 409);
